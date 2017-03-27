@@ -1,0 +1,5 @@
+/Debug/
+.project
+.settings
+.cproject
+*.o
