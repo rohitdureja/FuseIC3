@@ -300,7 +300,7 @@ int main(int argc, const char **argv)
     // EnvDeleter struct defined in utils.h
     // Object del_env of EnvDeleter deletes env
     // TODO: check if this is needed
-    //EnvDeleter del_env(env);
+    EnvDeleter del_env(env);
 
 
     // create object to store the tr

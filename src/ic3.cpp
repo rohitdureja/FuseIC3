@@ -223,22 +223,22 @@ bool IC3::rec_block(const Cube &bad)
                 cex.push_back(p->cube);
                 p = p->next;
             }
-//            if (refine_abstraction(cex)) {
-//                // upon successful refinement, we clear the queue of proof
-//                // obligations. This is because we have added more predicates,
-//                // so the proof obligations still in the queue now might be
-//                // imprecise wrt. the current predicate abstraction. If we
-//                // keep them around, we might get spurious counterexamples
-//                // even if the predicate abstraction is precise enough. In
-//                // principle we could handle this, but it is simpler to just
-//                // flush the queue
-//                while (!queue.empty()) {
-//                    queue.pop();
-//                }
-//                return true;
-//            } else {
-//                return false;
-//            }
+            if (refine_abstraction(cex)) {
+                // upon successful refinement, we clear the queue of proof
+                // obligations. This is because we have added more predicates,
+                // so the proof obligations still in the queue now might be
+                // imprecise wrt. the current predicate abstraction. If we
+                // keep them around, we might get spurious counterexamples
+                // even if the predicate abstraction is precise enough. In
+                // principle we could handle this, but it is simpler to just
+                // flush the queue
+                while (!queue.empty()) {
+                    queue.pop();
+                }
+                return true;
+            } else {
+                return false;
+            }
         }
 
         if (!is_blocked(p->cube, p->idx)) {
