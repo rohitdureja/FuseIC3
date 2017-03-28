@@ -76,10 +76,10 @@ IC3::IC3(const TransitionSystem &ts, const Options &opts):
 // public methods
 //-----------------------------------------------------------------------------
 
-void IC3::set_initial_predicates(const TermList &preds)
-{
-    preds_.insert(preds.begin(), preds.end());
-}
+//void IC3::set_initial_predicates(const TermList &preds)
+//{
+//    preds_.insert(preds.begin(), preds.end());
+//}
 
 
 bool IC3::prove()
@@ -166,7 +166,7 @@ bool IC3::check_init()
         wit_.push_back(TermList());
         // this is a bit more abstract than it could...
         get_cube_from_model(wit_.back());
-        concretize(wit_.back());
+//        concretize(wit_.back());
     }
 
     return !sat;
@@ -219,26 +219,28 @@ bool IC3::rec_block(const Cube &bad)
             // is real or spurious
             std::vector<TermList> cex;
             // build the cex trace by following the chain of CTIs
+            wit_.clear();
             while (p) {
-                cex.push_back(p->cube);
+                wit_.push_back(p->cube);
                 p = p->next;
             }
-            if (refine_abstraction(cex)) {
-                // upon successful refinement, we clear the queue of proof
-                // obligations. This is because we have added more predicates,
-                // so the proof obligations still in the queue now might be
-                // imprecise wrt. the current predicate abstraction. If we
-                // keep them around, we might get spurious counterexamples
-                // even if the predicate abstraction is precise enough. In
-                // principle we could handle this, but it is simpler to just
-                // flush the queue
-                while (!queue.empty()) {
-                    queue.pop();
-                }
-                return true;
-            } else {
-                return false;
-            }
+//            if (refine_abstraction(cex)) {
+//                // upon successful refinement, we clear the queue of proof
+//                // obligations. This is because we have added more predicates,
+//                // so the proof obligations still in the queue now might be
+//                // imprecise wrt. the current predicate abstraction. If we
+//                // keep them around, we might get spurious counterexamples
+//                // even if the predicate abstraction is precise enough. In
+//                // principle we could handle this, but it is simpler to just
+//                // flush the queue
+//                while (!queue.empty()) {
+//                    queue.pop();
+//                }
+//                return true;
+//            } else {
+//                return false;
+//            }
+            return false; // added by Rohit
         }
 
         if (!is_blocked(p->cube, p->idx)) {
@@ -330,7 +332,7 @@ bool IC3::propagate()
                 logcube(2, c);
                 logger(2) << endlog;
                 wit_.push_back(c);
-                concretize(wit_.back());
+//                concretize(wit_.back());
                 for (msat_term &l : wit_.back()) {
                     l = msat_make_not(ts_.get_env(), l);
                 }
@@ -552,7 +554,7 @@ void IC3::initialize()
             // vars. This makes the implementation of get_next() and refine()
             // simpler, as we do not need to check for special cases
             lbl2next_[v] = ts_.next(v);
-            lbl2pred_[v] = v;
+//            lbl2pred_[v] = v;
         }
     }
 
@@ -562,18 +564,18 @@ void IC3::initialize()
     msat_term bad = lit(ts_.prop(), true);
     solver_.add(bad, bad_label_);
 
-    abs_.initial_predicates(preds_);
-    for (msat_term t : preds_) {
-        add_pred(t);
-    }
+//    abs_.initial_predicates(preds_);
+//    for (msat_term t : preds_) {
+//        add_pred(t);
+//    }
 
     // the first frame is init
     frames_.push_back(Frame());
     frame_labels_.push_back(init_label_);
 
-    logger(1) << "initialized IC3: " << ts_.statevars().size() << " state vars,"
-              << " " << ts_.inputvars().size() << " input vars, "
-              << preds_.size() << " predicates" << endlog;
+//    logger(1) << "initialized IC3: " << ts_.statevars().size() << " state vars,"
+//              << " " << ts_.inputvars().size() << " input vars, "
+//              << preds_.size() << " predicates" << endlog;
 }
 
 
@@ -682,9 +684,9 @@ bool IC3::is_blocked(const Cube &c, unsigned int idx)
         }
     }
 
-    if (preds_.empty()) {
-        return false;
-    }
+//    if (preds_.empty()) {
+//        return false;
+//    }
 
     // then semantic
     activate_frame(idx);
@@ -819,22 +821,22 @@ void IC3::reset_solver()
 
     // re-add initial states, transition relation and bad states
     solver_.add(ts_.init(), init_label_);
-    solver_.add(abs_.abstract(ts_.trans()), trans_label_);
+    solver_.add(ts_.trans(), trans_label_);
     msat_term bad = lit(ts_.prop(), true);
     solver_.add(bad, bad_label_);
 
-    // re-add all the definitions for the predicates (see add_pred())
-    msat_term label = msat_make_true(ts_.get_env());
-    for (msat_term t : preds_) {
-        msat_term n = ts_.next(t);
-        msat_term a = abs_.abstract(n);
-        msat_term f = msat_make_iff(ts_.get_env(), n, a);
-        solver_.add(f, trans_label_);
-        msat_term l = pred2lbl_[t];
-        msat_term ln = lbl2next_[l];
-        solver_.add(msat_make_iff(ts_.get_env(), l, t), label);
-        solver_.add(msat_make_iff(ts_.get_env(), ln, n), label);
-    }
+//    // re-add all the definitions for the predicates (see add_pred())
+//    msat_term label = msat_make_true(ts_.get_env());
+//    for (msat_term t : preds_) {
+//        msat_term n = ts_.next(t);
+//        msat_term a = abs_.abstract(n);
+//        msat_term f = msat_make_iff(ts_.get_env(), n, a);
+//        solver_.add(f, trans_label_);
+//        msat_term l = pred2lbl_[t];
+//        msat_term ln = lbl2next_[l];
+//        solver_.add(msat_make_iff(ts_.get_env(), l, t), label);
+//        solver_.add(msat_make_iff(ts_.get_env(), ln, n), label);
+//    }
 
     // re-add all the clauses in the frames
     for (size_t i = 0; i < frames_.size(); ++i) {

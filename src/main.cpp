@@ -174,11 +174,11 @@ bool read_file(const Options &opts, TransitionSystem &ts, TermList &preds)
             msat_term n = msat_make_constant(ts.get_env(), d);
             statevars[t] = n;
         }
-        else if (key == "predicate" &&
-                   msat_is_bool_type(ts.get_env(), msat_term_get_type(t)) &&
-                   !msat_term_is_boolean_constant(ts.get_env(), t)) {
-            preds.push_back(t);
-        }
+//        else if (key == "predicate" &&
+//                   msat_is_bool_type(ts.get_env(), msat_term_get_type(t)) &&
+//                   !msat_term_is_boolean_constant(ts.get_env(), t)) {
+//            preds.push_back(t);
+//        }
     }
 
     // initialize the transition system
@@ -192,9 +192,9 @@ bool read_file(const Options &opts, TransitionSystem &ts, TermList &preds)
     }
     msat_free(annots);
 
-    if (opts.nopreds) {
-        preds.clear();
-    }
+//    if (opts.nopreds) {
+//        preds.clear();
+//    }
 
     logger(1) << "parsed system with " << statevars.size() << " state variables"
               << endlog;
@@ -333,7 +333,7 @@ int main(int argc, const char **argv)
     signal(SIGINT, handle_interrupt);
     the_ic3 = &ic3ia;
 
-    ic3ia.set_initial_predicates(preds);
+//    ic3ia.set_initial_predicates(preds);
 
     // check the transition system
     bool safe = ic3ia.prove();
