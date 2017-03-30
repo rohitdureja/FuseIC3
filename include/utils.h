@@ -33,7 +33,7 @@
 #include <stdint.h>
 
 
-// equality predicates and hash functions for msat_termS
+// equality predicates and hash functions for msat_terms
 
 inline bool operator==(msat_term a, msat_term b)
 {
@@ -243,7 +243,8 @@ public:
     struct EndLog { EndLog() {} };
     struct FlushLog { FlushLog() {} };
     
-    template <class T> Logger &operator<<(const T &msg)
+    template <class T>
+    Logger &operator<<(const T &msg)
     {
         if (level_ <= verbosity_) {
             std::cout << msg;

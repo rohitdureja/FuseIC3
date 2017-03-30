@@ -23,7 +23,6 @@
 #pragma once
 
 #include "ts.h"
-#include "ia.h"
 #include "solver.h"
 #include <queue>
 #include <random>
@@ -45,9 +44,6 @@ namespace vtsa2015 {
 class IC3 {
 public:
     IC3(const TransitionSystem &ts, const Options &opts);
-
-    void set_initial_predicates(const TermList &preds);
-    ///< sets the intial set of predicates to use for implicit abstraction
 
     bool prove();
     ///< main method: check whether the property holds or not
@@ -176,10 +172,6 @@ private:
     void push(Cube &c, unsigned int &idx);
     ///< find the highest index idx for which (~c & F[idx] & T |= ~c')
 
-    bool refine_abstraction(std::vector<TermList> &cex);
-    ///< check whether the input counterexample trace is spurious, and if so
-    ///< refine the current predicate abstraction using interpolants
-
     //------------------------------------------------------------------------
     // minor/helper methods
     //------------------------------------------------------------------------
@@ -248,12 +240,6 @@ private:
     msat_term lit(msat_term t, bool neg);
     ///< see lit() in utils.h
 
-    void add_pred(msat_term p);
-    ///< add a predicate to the current abstraction
-
-    void concretize(Cube &c);
-    ///< replaces each label with its corresponding predicate in c
-
     Logger &logcube(unsigned int level, const Cube &c);
     ///< logger function for cubes
 
@@ -308,21 +294,6 @@ private:
     ///< description of pred2lbl_). All cubes and clauses handled by IC3 are
     ///< always expressed over this set of variables
 
-    Abstractor abs_; ///< the abstractor for Implicit Abstraction
-    Refiner ref_; ///< the refiner for Implicit Abstraction
-
-    TermSet preds_;
-    ///< the current set of predicates used for Implicit Abstraction
-
-    TermMap pred2lbl_;
-    ///< mapping from a predicate in preds_ (or from its next version computed
-    ///< by ts_.next()) to a fresh Boolean label variable representing it in
-    ///< state_vars_. The connection between the predicate and its label is
-    ///< established by adding the formula (pred <-> label) to the SMT solver
-
-    TermMap lbl2pred_;
-    ///< inverse of the mapping above, using during abstraction refinement
-
     TermMap lbl2next_;
     ///< if l1 is the label for pred and l2 is the label for ts_.next(pred),
     ///< then lbl2next_[l1] = l2. This is used in get_next()
@@ -348,8 +319,6 @@ private:
     uint32_t num_added_cubes_;
     uint32_t num_subsumed_cubes_;
     uint32_t num_block_;
-    uint32_t num_refinements_;
-    uint32_t num_predicates_;
     uint32_t max_cube_size_;
     double avg_cube_size_;
     double solve_time_;
@@ -359,7 +328,6 @@ private:
     double generalize_and_push_time_;
     double rec_block_time_;
     double propagate_time_;
-    double refinement_time_;
     double total_time_;
 };
 

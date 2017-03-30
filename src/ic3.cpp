@@ -33,9 +33,7 @@ IC3::IC3(const TransitionSystem &ts, const Options &opts):
     opts_(opts),
     vp_(ts.get_env()),
     rng_(opts.seed),
-    solver_(ts.get_env(), opts),
-    abs_(ts),
-    ref_(ts, opts)
+    solver_(ts.get_env(), opts)
 {
     init_label_ = make_label("init");
     trans_label_ = make_label("trans");
@@ -54,9 +52,6 @@ IC3::IC3(const TransitionSystem &ts, const Options &opts):
 
     num_block_ = 0;
 
-    num_refinements_ = 0;
-    num_predicates_ = 0;
-
     max_cube_size_ = 0;
     avg_cube_size_ = 0;
 
@@ -67,7 +62,6 @@ IC3::IC3(const TransitionSystem &ts, const Options &opts):
     generalize_and_push_time_ = 0;
     rec_block_time_ = 0;
     propagate_time_ = 0;
-    refinement_time_ = 0;
     total_time_ = 0;
 }
 
@@ -76,18 +70,13 @@ IC3::IC3(const TransitionSystem &ts, const Options &opts):
 // public methods
 //-----------------------------------------------------------------------------
 
-//void IC3::set_initial_predicates(const TermList &preds)
-//{
-//    preds_.insert(preds.begin(), preds.end());
-//}
-
-
 bool IC3::prove()
 {
     // to maintain time, defined in utils.h
     TimeKeeper t(total_time_);
 
     initialize();
+
     if (!check_init()) {
         return false;
     }
@@ -95,6 +84,7 @@ bool IC3::prove()
     while (true) {
         Cube bad;
         while (get_bad(bad)) {
+
             if (!rec_block(bad)) {
                 logger(1) << "found counterexample at depth " << depth()
                           << endlog;
@@ -132,8 +122,6 @@ void IC3::print_stats() const
     print_stat(num_added_cubes);
     print_stat(num_subsumed_cubes);
     print_stat(num_block);
-    print_stat(num_refinements);
-    print_stat(num_predicates);
     print_stat(max_cube_size);
     print_stat(avg_cube_size);
     print_stat(solve_time);
@@ -143,7 +131,6 @@ void IC3::print_stats() const
     print_stat(generalize_and_push_time);
     print_stat(rec_block_time);
     print_stat(propagate_time);
-    print_stat(refinement_time);
     print_stat(total_time);
 }
 
@@ -166,7 +153,6 @@ bool IC3::check_init()
         wit_.push_back(TermList());
         // this is a bit more abstract than it could...
         get_cube_from_model(wit_.back());
-//        concretize(wit_.back());
     }
 
     return !sat;
@@ -175,7 +161,7 @@ bool IC3::check_init()
 
 bool IC3::get_bad(Cube &out)
 {
-    activate_frame(depth());
+	activate_frame(depth());
     activate_bad();
 
     if (solve()) {
@@ -198,6 +184,7 @@ bool IC3::rec_block(const Cube &bad)
     TimeKeeper t(rec_block_time_);
 
     ProofQueue queue;
+
     queue.push_new(bad, depth());
 
     while (!queue.empty()) {
@@ -224,23 +211,7 @@ bool IC3::rec_block(const Cube &bad)
                 wit_.push_back(p->cube);
                 p = p->next;
             }
-//            if (refine_abstraction(cex)) {
-//                // upon successful refinement, we clear the queue of proof
-//                // obligations. This is because we have added more predicates,
-//                // so the proof obligations still in the queue now might be
-//                // imprecise wrt. the current predicate abstraction. If we
-//                // keep them around, we might get spurious counterexamples
-//                // even if the predicate abstraction is precise enough. In
-//                // principle we could handle this, but it is simpler to just
-//                // flush the queue
-//                while (!queue.empty()) {
-//                    queue.pop();
-//                }
-//                return true;
-//            } else {
-//                return false;
-//            }
-            return false; // added by Rohit
+            return false;
         }
 
         if (!is_blocked(p->cube, p->idx)) {
@@ -332,7 +303,6 @@ bool IC3::propagate()
                 logcube(2, c);
                 logger(2) << endlog;
                 wit_.push_back(c);
-//                concretize(wit_.back());
                 for (msat_term &l : wit_.back()) {
                     l = msat_make_not(ts_.get_env(), l);
                 }
@@ -393,6 +363,7 @@ bool IC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
             Cube &candidate = *out;
             Cube rest;
             candidate.clear();
+
             for (size_t i = 0; i < primed.size(); ++i) {
                 msat_term a = primed[i];
                 if (core.find(a) != core.end()) {
@@ -496,50 +467,6 @@ void IC3::push(Cube &c, unsigned int &idx)
 }
 
 
-inline void IC3::concretize(Cube &c)
-{
-    for (msat_term &t : c) {
-        auto it = lbl2pred_.find(var(t));
-        assert(it != lbl2pred_.end());
-        t = lit(it->second, it->first != t);
-    }
-}
-
-
-bool IC3::refine_abstraction(std::vector<TermList> &cex)
-{
-    TimeKeeper t(refinement_time_);
-    ++num_refinements_;
-
-    logger(1) << "trying to refine cex of length " << cex.size() << endlog;
-
-    if (!preds_.empty()) {
-        // replace each label with the corresponding predicate
-        for (TermList &l : cex) {
-            concretize(l);
-        }
-    }
-
-    if (ref_.refine(cex)) {
-        // if refinement is successful, we extract new predicates from the
-        // sequence interpolant
-        int c = 0;
-        for (msat_term p : ref_.used_predicates()) {
-            if (preds_.insert(p).second) {
-                ++c;
-                add_pred(p);
-            }
-        }
-        logger(1) << "refinement added " << c << " new predicates" << endlog;
-        return true;
-    } else {
-        wit_.clear();
-        ref_.counterexample(wit_);
-        return false;
-    }
-}
-
-
 //-----------------------------------------------------------------------------
 // minor/helper methods
 //-----------------------------------------------------------------------------
@@ -554,28 +481,20 @@ void IC3::initialize()
             // vars. This makes the implementation of get_next() and refine()
             // simpler, as we do not need to check for special cases
             lbl2next_[v] = ts_.next(v);
-//            lbl2pred_[v] = v;
         }
     }
 
     solver_.add(ts_.init(), init_label_);
     solver_.add(ts_.trans(), trans_label_);
-    //solver_.add(abs_.abstract(ts_.trans()), trans_label_);
     msat_term bad = lit(ts_.prop(), true);
     solver_.add(bad, bad_label_);
-
-//    abs_.initial_predicates(preds_);
-//    for (msat_term t : preds_) {
-//        add_pred(t);
-//    }
 
     // the first frame is init
     frames_.push_back(Frame());
     frame_labels_.push_back(init_label_);
 
-//    logger(1) << "initialized IC3: " << ts_.statevars().size() << " state vars,"
-//              << " " << ts_.inputvars().size() << " input vars, "
-//              << preds_.size() << " predicates" << endlog;
+    logger(1) << "initialized IC3: " << ts_.statevars().size() << " state vars,"
+              << " " << ts_.inputvars().size() << " input vars " << endlog;
 }
 
 
@@ -684,10 +603,6 @@ bool IC3::is_blocked(const Cube &c, unsigned int idx)
         }
     }
 
-//    if (preds_.empty()) {
-//        return false;
-//    }
-
     // then semantic
     activate_frame(idx);
     activate_trans_bad(false, false);
@@ -748,6 +663,7 @@ inline void IC3::activate_frame(unsigned int idx)
 
 
 inline void IC3::activate_bad() { activate_trans_bad(false, true); }
+
 inline void IC3::activate_trans() { activate_trans_bad(true, false); }
 
 inline void IC3::activate_trans_bad(bool trans_active, bool bad_active)
@@ -779,39 +695,6 @@ bool IC3::solve()
 }
 
 
-void IC3::add_pred(msat_term p)
-{
-    msat_term n = ts_.next(p);
-    msat_term a = abs_.abstract(n);
-    msat_term f = msat_make_iff(ts_.get_env(), n, a);
-    // link the concrete and abstract version of the predicate (this is
-    // implicit abstraction)
-    solver_.add(f, trans_label_);
-
-    // create Boolean labels for the predicate definition
-    // one for the current-state predicate
-    msat_term l = vp_.fresh_var("pred");
-    pred2lbl_[p] = l;
-    lbl2pred_[l] = p;
-    // one for the next-state predicate
-    msat_term ln = vp_.fresh_var("pred_next");
-    lbl2next_[l] = ln;
-
-    logger(2) << "adding predicate " << (++num_predicates_) << ": "
-              << logterm(ts_.get_env(), l) << " := "
-              << logterm(ts_.get_env(), p) << endlog;
-
-
-    // add the definitions to the solver
-    solver_.add(msat_make_and(ts_.get_env(),
-                              msat_make_iff(ts_.get_env(), l, p),
-                              msat_make_iff(ts_.get_env(), ln, n)),
-                msat_make_true(ts_.get_env()));
-    // now consider the predicate label as a state variable
-    state_vars_.push_back(l);
-}
-
-
 void IC3::reset_solver()
 {
     logger(2) << "resetting SMT solver" << endlog;
@@ -824,19 +707,6 @@ void IC3::reset_solver()
     solver_.add(ts_.trans(), trans_label_);
     msat_term bad = lit(ts_.prop(), true);
     solver_.add(bad, bad_label_);
-
-//    // re-add all the definitions for the predicates (see add_pred())
-//    msat_term label = msat_make_true(ts_.get_env());
-//    for (msat_term t : preds_) {
-//        msat_term n = ts_.next(t);
-//        msat_term a = abs_.abstract(n);
-//        msat_term f = msat_make_iff(ts_.get_env(), n, a);
-//        solver_.add(f, trans_label_);
-//        msat_term l = pred2lbl_[t];
-//        msat_term ln = lbl2next_[l];
-//        solver_.add(msat_make_iff(ts_.get_env(), l, t), label);
-//        solver_.add(msat_make_iff(ts_.get_env(), ln, n), label);
-//    }
 
     // re-add all the clauses in the frames
     for (size_t i = 0; i < frames_.size(); ++i) {
