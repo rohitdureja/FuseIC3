@@ -1,5 +1,7 @@
 /*
  * This file is part of Nexus Model Checker.
+ * author: Rohit Dureja <dureja at iastate dot edu>
+ *
  * Copyright (C) 2017 Rohit Dureja.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -229,6 +231,8 @@ int main(int argc, const char **argv)
     EnvDeleter del_env(env);
 
     if(options.family == false) {
+        // run normal IC3
+
 		// create object to store the tr
 		TransitionSystem ts(env);
 
@@ -275,6 +279,8 @@ int main(int argc, const char **argv)
 		std::cout << (safe ? "safe" : "unsafe") << std::endl;
     }
     else if (options.family == true) {
+        // run family IC3
+
         std::cout << "Now running Family IC3." << std::endl;
         if (options.algorithm == 0) {
             std::cout << "No algorithm number specified!" << std::endl
