@@ -5,6 +5,7 @@ enable_language(CXX C)
 # set the c++ standard
 set(CMAKE_CXX_STANDARD 11)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++")
 # bring in the source files
 file(GLOB SOURCES "src/*.cpp")
 
