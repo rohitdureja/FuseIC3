@@ -22,7 +22,7 @@
 
 #include "utils.h"
 
-namespace vtsa2015 {
+namespace nexus {
 
 msat_config get_config(ModelGeneration model, bool interpolation)
 {
@@ -109,4 +109,4 @@ msat_config get_config(ModelGeneration model, bool interpolation)
 
 Logger Logger::the_logger_;
 
-} // namespace vtsa2015
+} // namespace nexus

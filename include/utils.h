@@ -60,7 +60,7 @@ struct hash<::msat_term> {
 } // namespace std
 
 
-namespace vtsa2015 {
+namespace nexus {
 
 /**
  * Destructor class for msat_env
@@ -357,4 +357,4 @@ private:
 };
 
 
-} // namespace vtsa2015
+} // namespace nexus

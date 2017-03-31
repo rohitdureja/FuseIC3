@@ -26,7 +26,7 @@
 #include "opts.h"
 
 
-namespace vtsa2015 {
+namespace nexus {
 
 /**
  * A class for managing the interaction between the IC3 engine and the SMT
@@ -89,4 +89,4 @@ private:
     ///< subset of assumptions sufficient for unsatisfiability
 };
 
-} // namespace vtsa2015
+} // namespace nexus

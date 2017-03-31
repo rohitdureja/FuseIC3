@@ -24,27 +24,23 @@
 
 #include <string>
 
-namespace vtsa2015 {
+namespace nexus {
 
 struct Options {
     int verbosity;
     bool witness;
-    bool nopreds;
     std::string filename;
-    std::string trace;
-    int seed;
     bool stack;
+    bool family;
 
     Options()
     {
         verbosity = 0;
+        family = false;
         witness = false;
-        nopreds = false;
         filename = "";
-        trace = "";
-        seed = 0;
         stack = false;
     }
 };
 
-} // namespace vtsa2015
+} // namespace nexus

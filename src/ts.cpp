@@ -23,7 +23,7 @@
 #include "ts.h"
 #include <algorithm>
 
-namespace vtsa2015 {
+namespace nexus {
 
 // constructor for TransitionSystem object
 TransitionSystem::TransitionSystem(msat_env env):
@@ -138,4 +138,4 @@ msat_term TransitionSystem::next(msat_term cur_formula) const
     return apply_substitution(env_, cur_formula, cur2next_, identity);
 }
 
-} // namespace vtsa2015
+} // namespace nexus

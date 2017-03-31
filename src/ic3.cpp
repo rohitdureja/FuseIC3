@@ -26,13 +26,12 @@
 #include <algorithm>
 
 
-namespace vtsa2015 {
+namespace nexus {
 
 IC3::IC3(const TransitionSystem &ts, const Options &opts):
     ts_(ts),
     opts_(opts),
     vp_(ts.get_env()),
-    rng_(opts.seed),
     solver_(ts.get_env(), opts)
 {
     init_label_ = make_label("init");
@@ -332,18 +331,8 @@ bool IC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
 
     // assume c'
     Cube primed = get_next(c);
-    if (opts_.seed) {
-        std::vector<size_t> idx(primed.size());
-        std::iota(idx.begin(), idx.end(), 0);
-        std::shuffle(idx.begin(), idx.end(), rng_);
-
-        for (size_t i : idx) {
-            solver_.assume(primed[i]);
-        }
-    } else {
         for (msat_term l : primed) {
             solver_.assume(l);
-        }
     }
 
     // temporarily assert ~c
@@ -426,13 +415,9 @@ void IC3::generalize(Cube &c, unsigned int &idx)
     // - Hassan, Somenzi, Bradley: Better generalization in IC3. FMCAD'13
     //
     for (size_t i = 0; i < tmp_.size() && tmp_.size() > 1; ) {
-        // randomly pick the next literal to drop
-        size_t j = (opts_.seed ?
-                    dis(rng_, RandInt::param_type(1, tmp_.size())) - 1 :
-                    i);
-        msat_term l = tmp_[j];
+        msat_term l = tmp_[i];
         if (gen_needed_.find(l) == gen_needed_.end()) {
-            auto it = tmp_.erase(tmp_.begin()+j);
+            auto it = tmp_.erase(tmp_.begin()+i);
 
             logger(3) << "trying to drop " << logterm(ts_.get_env(), l)
                       << endlog;
@@ -732,13 +717,13 @@ inline msat_term IC3::make_label(const char *name)
 
 inline msat_term IC3::var(msat_term t)
 {
-    return vtsa2015::var(ts_.get_env(), t);
+    return nexus::var(ts_.get_env(), t);
 }
 
 
 inline msat_term IC3::lit(msat_term t, bool neg)
 {
-    return vtsa2015::lit(ts_.get_env(), t, neg);
+    return nexus::lit(ts_.get_env(), t, neg);
 }
 
 
@@ -754,4 +739,4 @@ Logger &IC3::logcube(unsigned int level, const Cube &c)
 }
 
 
-} // namespace vtsa2015
+} // namespace nexus

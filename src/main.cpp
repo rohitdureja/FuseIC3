@@ -23,7 +23,7 @@
 #include <signal.h>
 
 
-using namespace vtsa2015;
+using namespace nexus;
 
 IC3 *the_ic3 = NULL;
 
@@ -167,43 +167,16 @@ Options parse_options(int argc, const char **argv)
             }
         } else if (a == "-w") {
             ret.witness = true;
-        } else if (a == "-p") {
-            ret.nopreds = true;
-        } else if (a == "-t") {
-            if (i+1 < argc) {
-                ret.trace = argv[i+1];
-                ++i;
-            } else {
-                ok = false;
-                break;
-            }
-        } else if (a == "-r") {
-            if (i+1 < argc) {
-                std::istringstream buf(argv[i+1]);
-                int val;
-                if (buf >> val) {
-                    ret.seed = val;
-                } else {
-                    ok = false;
-                    break;
-                }
-                ++i;
-            } else {
-                ok = false;
-                break;
-            }
+        } else if (a == "-f") {
+        	ret.family = true;
         } else if (a == "-s") {
             ret.stack = true;
         } else if (a == "-h" || a == "-help" || a == "--help") {
             std::cout << "USAGE: " << argv[0] << " [OPTIONS] FILENAME.vmt"
                       << "\n\n   -v N : set verbosity level"
                       << "\n   -w : print witness"
-                      << "\n   -p : do not use initial predicates (if any)"
-                      << "\n   -t NAME : dump SMT queries into NAME.main.smt2 "
-                      << "and NAME.itp.smt2"
-                      << "\n   -r VAL : set random seed to VAL "
-                      << "(0 to disable [default])"
                       << "\n   -s : stack-based proof obligation management"
+					  << "\n   -f : family mode"
                       << std::endl;
             exit(0);
             break;
@@ -236,58 +209,57 @@ int main(int argc, const char **argv)
     // destroy mathsat configurations
     msat_destroy_config(config);
 
-    // EnvDeleter struct defined in utils.h
-    // Object del_env of EnvDeleter deletes env
-    // TODO: check if this is needed
+    // delete mathsat environment
     EnvDeleter del_env(env);
 
+    if(options.family == false) {
+		// create object to store the tr
+		TransitionSystem ts(env);
 
-    // create object to store the tr
-    TransitionSystem ts(env);
+		// read_ts parses the VMT file
+		if (!read_file(options, ts)) {
+			// error in reading file
+			std::cout << "ERROR reading input" << std::endl;
+			return 1;
+		}
 
-    // read_ts parses the VMT file
-    // defined in main.cpp
-    if (!read_file(options, ts)) {
-        // error in reading file
-        std::cout << "ERROR reading input" << std::endl;
-        return 1;
+		// at this point model has been and stored in ts
+
+		// create IC3 instance
+		IC3 ic3ia(ts, options);
+
+		signal(SIGINT, handle_interrupt);
+
+		the_ic3 = &ic3ia;
+
+		// check the transition system
+		bool safe = ic3ia.prove();
+
+		if (options.witness) {
+			std::vector<TermList> wit;
+			if (!ic3ia.witness(wit)) {
+				std::cout << "ERROR computing witness" << std::endl;
+			} else {
+				std::cout << (safe ? "invariant" : "counterexample") << "\n";
+				for (size_t i = 0; i < wit.size(); ++i) {
+					TermList &w = wit[i];
+					std::cout << ";; " << (safe ? "clause " : "step ") << i
+							  << "\n" << (safe ? "(or" : "(and") << "\n";
+					for (msat_term t : w) {
+						std::cout << "  " << logterm(env, t) << "\n";
+					}
+					std::cout << ")\n";
+				}
+				std::cout.flush();
+			}
+		}
+
+		ic3ia.print_stats();
+
+		std::cout << (safe ? "safe" : "unsafe") << std::endl;
     }
-
-    // at this point model has been and stored in ts
-
-    // create IC3 instance
-    IC3 ic3ia(ts, options);
-
-
-    signal(SIGINT, handle_interrupt);
-
-
-    the_ic3 = &ic3ia;
-
-    // check the transition system
-    bool safe = ic3ia.prove();
-
-    if (options.witness) {
-        std::vector<TermList> wit;
-        if (!ic3ia.witness(wit)) {
-            std::cout << "ERROR computing witness" << std::endl;
-        } else {
-            std::cout << (safe ? "invariant" : "counterexample") << "\n";
-            for (size_t i = 0; i < wit.size(); ++i) {
-                TermList &w = wit[i];
-                std::cout << ";; " << (safe ? "clause " : "step ") << i
-                          << "\n" << (safe ? "(or" : "(and") << "\n";
-                for (msat_term t : w) {
-                    std::cout << "  " << logterm(env, t) << "\n";
-                }
-                std::cout << ")\n";
-            }
-            std::cout.flush();
-        }
+    else if (options.family == true) {
+    	std::cout << "Under development" << std::endl;
     }
-
-    ic3ia.print_stats();
-
-    std::cout << (safe ? "safe" : "unsafe") << std::endl;
     return 0;
 }

@@ -22,17 +22,12 @@
 
 #include "solver.h"
 
-namespace vtsa2015 {
+namespace nexus {
 
 
 Solver::Solver(msat_env env, const Options &opts)
 {
     msat_config cfg = get_config(BOOL_MODEL);
-    if (!opts.trace.empty()) {
-        std::string name = opts.trace + ".main.smt2";
-        msat_set_option(cfg, "debug.api_call_trace", "1");
-        msat_set_option(cfg, "debug.api_call_trace_filename", name.c_str());
-    }
     env_ = msat_create_shared_env(cfg, env);
     msat_destroy_config(cfg);
 }
@@ -151,4 +146,4 @@ bool Solver::model_value(msat_term pred)
 }
 
 
-} // namespace vtsa2015
+} // namespace nexus

@@ -24,7 +24,7 @@
 
 #include "utils.h"
 
-namespace vtsa2015 {
+namespace nexus {
 
 /**
  * A simple class for representing a transition system.
@@ -92,4 +92,4 @@ private:
     msat_term prop_;
 };
 
-} // namespace vtsa2015
+} // namespace nexus

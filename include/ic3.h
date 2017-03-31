@@ -28,7 +28,7 @@
 #include <random>
 
 
-namespace vtsa2015 {
+namespace nexus {
 
 /**
  * A simple implementation of the IC3 algorithm, using Implicit Predicate
@@ -251,7 +251,6 @@ private:
     const Options &opts_; ///< algorithm options
 
     VarProvider vp_; ///< provider for fresh variables
-    std::minstd_rand rng_; ///< pseudo-random number generator
 
     Solver solver_; ///< the SMT solver
 
@@ -331,4 +330,4 @@ private:
     double total_time_;
 };
 
-} // namespace vtsa2015
+} // namespace nexus
