@@ -1,9 +1,23 @@
-/** -*- C++ -*-
+/*
+ * This file is part of Nexus Model Checker.
+ * Copyright (C) 2017 Rohit Dureja.
  *
- * IC3 with implicit abstraction
- * author: Alberto Griggio <griggio@fbk.eu>
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * This file is part of ic3ia.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * --- Derived from ic3ia by Alberto Griggio ---
+ * ---   Copyright of original code follows  ---
+ *
  * Copyright (C) 2015 Fondazione Bruno Kessler.
  *
  * ic3ia is free software: you can redistribute it and/or modify
@@ -20,7 +34,7 @@
  * along with ic3ia.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ic3.h"
+#include <simple_ic3.h>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -28,7 +42,7 @@
 
 namespace nexus {
 
-IC3::IC3(const TransitionSystem &ts, const Options &opts):
+SimpleIC3::SimpleIC3(const TransitionSystem &ts, const Options &opts):
     ts_(ts),
     opts_(opts),
     vp_(ts.get_env()),
@@ -69,7 +83,7 @@ IC3::IC3(const TransitionSystem &ts, const Options &opts):
 // public methods
 //-----------------------------------------------------------------------------
 
-bool IC3::prove()
+bool SimpleIC3::prove()
 {
     // to maintain time, defined in utils.h
     TimeKeeper t(total_time_);
@@ -98,7 +112,7 @@ bool IC3::prove()
 }
 
 
-bool IC3::witness(std::vector<TermList> &out)
+bool SimpleIC3::witness(std::vector<TermList> &out)
 {
     if (!wit_.empty()) {
         std::swap(wit_, out);
@@ -108,7 +122,7 @@ bool IC3::witness(std::vector<TermList> &out)
 }
 
 
-void IC3::print_stats() const
+void SimpleIC3::print_stats() const
 {
 #define print_stat(n)                        \
     std::cout << #n << " = " << std::setprecision(3) << std::fixed       \
@@ -139,7 +153,7 @@ void IC3::print_stats() const
 //-----------------------------------------------------------------------------
 
 
-bool IC3::check_init()
+bool SimpleIC3::check_init()
 {
     TimeKeeper t(solve_time_);
 
@@ -158,7 +172,7 @@ bool IC3::check_init()
 }
 
 
-bool IC3::get_bad(Cube &out)
+bool SimpleIC3::get_bad(Cube &out)
 {
 	activate_frame(depth());
     activate_bad();
@@ -178,7 +192,7 @@ bool IC3::get_bad(Cube &out)
 }
 
 
-bool IC3::rec_block(const Cube &bad)
+bool SimpleIC3::rec_block(const Cube &bad)
 {
     TimeKeeper t(rec_block_time_);
 
@@ -257,7 +271,7 @@ bool IC3::rec_block(const Cube &bad)
 }
 
 
-bool IC3::propagate()
+bool SimpleIC3::propagate()
 {
     TimeKeeper t(propagate_time_);
     std::vector<Cube> to_add;
@@ -314,7 +328,7 @@ bool IC3::propagate()
 }
 
 
-bool IC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
+bool SimpleIC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
 {
     TimeKeeper t(block_time_);
     ++num_block_;
@@ -392,7 +406,7 @@ bool IC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
 }
 
 
-void IC3::generalize(Cube &c, unsigned int &idx)
+void SimpleIC3::generalize(Cube &c, unsigned int &idx)
 {
     tmp_ = c;
     gen_needed_.clear();
@@ -436,7 +450,7 @@ void IC3::generalize(Cube &c, unsigned int &idx)
 }
 
 
-void IC3::push(Cube &c, unsigned int &idx)
+void SimpleIC3::push(Cube &c, unsigned int &idx)
 {
     // find the highest idx frame in F which can successfully block c. As a
     // byproduct, this also further strenghens ~c if possible
@@ -457,7 +471,7 @@ void IC3::push(Cube &c, unsigned int &idx)
 //-----------------------------------------------------------------------------
 
 
-void IC3::initialize()
+void SimpleIC3::initialize()
 {
     for (msat_term v : ts_.statevars()) {
         if (msat_term_is_boolean_constant(ts_.get_env(), v)) {
@@ -483,7 +497,7 @@ void IC3::initialize()
 }
 
 
-void IC3::new_frame()
+void SimpleIC3::new_frame()
 {
     if (depth()) {
         logger(1) << depth() << ": " << flushlog;
@@ -499,7 +513,7 @@ void IC3::new_frame()
 }
 
 
-void IC3::generalize_and_push(Cube &c, unsigned int &idx)
+void SimpleIC3::generalize_and_push(Cube &c, unsigned int &idx)
 {
     TimeKeeper t(generalize_and_push_time_);
 
@@ -508,7 +522,7 @@ void IC3::generalize_and_push(Cube &c, unsigned int &idx)
 }
 
 
-void IC3::add_blocked(Cube &c, unsigned int idx)
+void SimpleIC3::add_blocked(Cube &c, unsigned int idx)
 {
     // whenever we add a clause ~c to an element of F, we also remove subsumed
     // clauses. This automatically keeps frames_ in a "delta encoded" form, in
@@ -543,7 +557,7 @@ void IC3::add_blocked(Cube &c, unsigned int idx)
 }
 
 
-IC3::Cube IC3::get_next(const Cube &c)
+SimpleIC3::Cube SimpleIC3::get_next(const Cube &c)
 {
     Cube ret;
     ret.reserve(c.size());
@@ -557,7 +571,7 @@ IC3::Cube IC3::get_next(const Cube &c)
 }
 
 
-void IC3::get_cube_from_model(Cube &out)
+void SimpleIC3::get_cube_from_model(Cube &out)
 {
     out.clear();
     for (msat_term v : state_vars_) {
@@ -567,14 +581,14 @@ void IC3::get_cube_from_model(Cube &out)
 }
 
 
-inline bool IC3::subsumes(const Cube &a, const Cube &b)
+inline bool SimpleIC3::subsumes(const Cube &a, const Cube &b)
 {
     return (a.size() <= b.size() &&
             std::includes(b.begin(), b.end(), a.begin(), a.end()));
 }
 
 
-bool IC3::is_blocked(const Cube &c, unsigned int idx)
+bool SimpleIC3::is_blocked(const Cube &c, unsigned int idx)
 {
     // first check syntactic subsumption
     for (size_t i = idx; i < frames_.size(); ++i) {
@@ -601,7 +615,7 @@ bool IC3::is_blocked(const Cube &c, unsigned int idx)
 }
 
 
-bool IC3::is_initial(const Cube &c)
+bool SimpleIC3::is_initial(const Cube &c)
 {
     activate_frame(0);
     activate_trans_bad(false, false);
@@ -614,7 +628,7 @@ bool IC3::is_initial(const Cube &c)
 }
 
 
-void IC3::ensure_not_initial(Cube &c, Cube &rest)
+void SimpleIC3::ensure_not_initial(Cube &c, Cube &rest)
 {
     // we know that "init & c & rest" is unsat. If "init & c" is sat, we find
     // a small subset of "rest" to add-back to c to restore unsatisfiability
@@ -639,7 +653,7 @@ void IC3::ensure_not_initial(Cube &c, Cube &rest)
 }
 
 
-inline void IC3::activate_frame(unsigned int idx)
+inline void SimpleIC3::activate_frame(unsigned int idx)
 {
     for (unsigned int i = 0; i < frame_labels_.size(); ++i) {
         solver_.assume(lit(frame_labels_[i], i < idx));
@@ -647,18 +661,18 @@ inline void IC3::activate_frame(unsigned int idx)
 }
 
 
-inline void IC3::activate_bad() { activate_trans_bad(false, true); }
+inline void SimpleIC3::activate_bad() { activate_trans_bad(false, true); }
 
-inline void IC3::activate_trans() { activate_trans_bad(true, false); }
+inline void SimpleIC3::activate_trans() { activate_trans_bad(true, false); }
 
-inline void IC3::activate_trans_bad(bool trans_active, bool bad_active)
+inline void SimpleIC3::activate_trans_bad(bool trans_active, bool bad_active)
 {
     solver_.assume(lit(trans_label_, !trans_active));
     solver_.assume(lit(bad_label_, !bad_active));
 }
 
 
-bool IC3::solve()
+bool SimpleIC3::solve()
 {
     double elapse = 0;
     bool ret = false;
@@ -680,7 +694,7 @@ bool IC3::solve()
 }
 
 
-void IC3::reset_solver()
+void SimpleIC3::reset_solver()
 {
     logger(2) << "resetting SMT solver" << endlog;
     ++num_solver_reset_;
@@ -703,31 +717,31 @@ void IC3::reset_solver()
 }
 
 
-inline size_t IC3::depth()
+inline size_t SimpleIC3::depth()
 {
     return frames_.size()-1;
 }
 
 
-inline msat_term IC3::make_label(const char *name)
+inline msat_term SimpleIC3::make_label(const char *name)
 {
     return vp_.fresh_var(name);
 }
 
 
-inline msat_term IC3::var(msat_term t)
+inline msat_term SimpleIC3::var(msat_term t)
 {
     return nexus::var(ts_.get_env(), t);
 }
 
 
-inline msat_term IC3::lit(msat_term t, bool neg)
+inline msat_term SimpleIC3::lit(msat_term t, bool neg)
 {
     return nexus::lit(ts_.get_env(), t, neg);
 }
 
 
-Logger &IC3::logcube(unsigned int level, const Cube &c)
+Logger &SimpleIC3::logcube(unsigned int level, const Cube &c)
 {
     logger(level) << "[ ";
     for (msat_term l : c) {

@@ -17,15 +17,15 @@
  */
 
 
-#include "ic3.h"
 #include <iostream>
 #include <stdlib.h>
 #include <signal.h>
+#include <simple_ic3.h>
 
 
 using namespace nexus;
 
-IC3 *the_ic3 = NULL;
+SimpleIC3 *simple_ic3 = NULL;
 
 
 /** \brief Handler for raised interrupts
@@ -38,8 +38,8 @@ IC3 *the_ic3 = NULL;
  */
 void handle_interrupt(int signo)
 {
-    if (the_ic3) {
-        the_ic3->print_stats();
+    if (simple_ic3) {
+        simple_ic3->print_stats();
     }
     std::cout 	<< "interrupted by signal " << signo << "\nunknown"
     			<< std::endl;
@@ -169,6 +169,21 @@ Options parse_options(int argc, const char **argv)
             ret.witness = true;
         } else if (a == "-f") {
         	ret.family = true;
+        } else if (a == "-o") {
+            if (i+1 < argc) {
+                std::istringstream buf(argv[i+1]);
+                int val;
+                if (buf >> val) {
+                    ret.algorithm = val;
+                } else {
+                    ok = false;
+                    break;
+                }
+                ++i;
+            } else {
+                ok = false;
+                break;
+            }
         } else if (a == "-s") {
             ret.stack = true;
         } else if (a == "-h" || a == "-help" || a == "--help") {
@@ -177,6 +192,7 @@ Options parse_options(int argc, const char **argv)
                       << "\n   -w : print witness"
                       << "\n   -s : stack-based proof obligation management"
 					  << "\n   -f : family mode"
+					  << "\n   -o N : set algorithm number"
                       << std::endl;
             exit(0);
             break;
@@ -226,18 +242,18 @@ int main(int argc, const char **argv)
 		// at this point model has been and stored in ts
 
 		// create IC3 instance
-		IC3 ic3ia(ts, options);
+		SimpleIC3 ic3(ts, options);
 
 		signal(SIGINT, handle_interrupt);
 
-		the_ic3 = &ic3ia;
+		simple_ic3 = &ic3;
 
 		// check the transition system
-		bool safe = ic3ia.prove();
+		bool safe = ic3.prove();
 
 		if (options.witness) {
 			std::vector<TermList> wit;
-			if (!ic3ia.witness(wit)) {
+			if (!ic3.witness(wit)) {
 				std::cout << "ERROR computing witness" << std::endl;
 			} else {
 				std::cout << (safe ? "invariant" : "counterexample") << "\n";
@@ -254,12 +270,25 @@ int main(int argc, const char **argv)
 			}
 		}
 
-		ic3ia.print_stats();
+		ic3.print_stats();
 
 		std::cout << (safe ? "safe" : "unsafe") << std::endl;
     }
     else if (options.family == true) {
-    	std::cout << "Under development" << std::endl;
+        std::cout << "Now running Family IC3." << std::endl;
+        if (options.algorithm == 0) {
+            std::cout << "No algorithm number specified!" << std::endl
+                      << "Specify algorithm using the -o option (use -h for help)"
+                      << std::endl;
+        }
+        else if (!(options.algorithm >=1 && options.algorithm <=12)) {
+            std::cout << "Incorrect algorithm number specified!" << std::endl
+                      << "Specify algorithm using the -o option (use -h for help)"
+                      << std::endl;
+        }
+        else {
+            std::cout << "Using algorithm: " << options.algorithm << std::endl;
+        }
     }
     return 0;
 }

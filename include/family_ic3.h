@@ -41,9 +41,9 @@ namespace nexus {
  * - Een, Mischenko, Brayton: Efficient Implementation of Property-Directed
  *   Reachability. FMCAD'11
  */
-class IC3 {
+class FamilyIC3 {
 public:
-    IC3(const TransitionSystem &ts, const Options &opts);
+    FamilyIC3(const TransitionSystem &ts, const Options &opts);
 
     bool prove();
     ///< main method: check whether the property holds or not
