@@ -97,7 +97,10 @@ bool FamilyIC3::prove()
 
     initialize();
 
-//    initial_invariant_check();
+    // check if last found invariant is valid in the new model
+    if(initial_invariant_check())
+        return true;
+
 
     if (!check_init()) {
         return false;
@@ -111,12 +114,13 @@ bool FamilyIC3::prove()
             if (!rec_block(bad)) {
                 logger(1) << "found counterexample at depth " << depth()
                           << endlog;
+                model_count_ += 1;
                 return false;
             }
         }
         new_frame();
         if (propagate()) {
-            initial_invariant_check();
+            model_count_ += 1;
             return true;
         }
     }
@@ -170,7 +174,7 @@ void FamilyIC3::print_stats() const
 // method to check if new model satisfies last known invariant
 bool FamilyIC3::initial_invariant_check()
 {
-    if(!last_invariant_.empty()) {
+    if(model_count_ > 0 && !last_invariant_.empty()) {
         logger(2) << "Trying last known invariant:" << endlog;
         for(Cube &c: last_invariant_) {
             logcube(2, c);
