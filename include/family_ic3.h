@@ -158,6 +158,10 @@ private:
     bool initial_invariant_check();
     ///< check whether the model satisfies the previously found invariant
 
+    bool invariant_finder(std::vector<TermList> &invariant);
+    ///< find the minimal subclause in the last found invariants that is
+    ///< inductive with respect to the current model being checked
+
     bool check_init();
     ///< check whether the property is satisfied by the initial states
 
@@ -267,6 +271,14 @@ private:
 
     bool consecution_check(const std::vector<TermList> &inv);
     ///< check if invariant satisfies consecution, Inv & T => Inv'
+
+    void remove_clauses_violating_init(std::vector<TermList> &cubes);
+    ///< remove clauses from cubes not in the initial states set
+
+    bool find_minimal_inductive_subclause(std::vector<TermList> &cubes);
+    ///< find minimal inductive subclause c (subset of cubes)
+    ///< such that c & T => c'. Return true and replace cubes with found
+    ///< sublcause, if one exists. Otherwise, return false.
 
     //------------------------------------------------------------------------
     // internal state

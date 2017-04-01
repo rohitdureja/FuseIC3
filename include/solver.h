@@ -40,6 +40,7 @@
 
 #include "utils.h"
 #include "opts.h"
+#include "assert.h"
 
 
 namespace nexus {
@@ -53,6 +54,9 @@ public:
     Solver(msat_env env, const Options &opts);
     ~Solver();
 
+    void add(msat_term formula);
+    ///< adds the assertion formula to the SMT solver
+
     void add(msat_term formula, msat_term label);
     ///< adds the assertion "label -> formula" to the SMT solver
     
@@ -65,6 +69,9 @@ public:
     void add_cube_as_clause(const TermList &cube);
     ///< like the above, when no label is needed
     
+    void add_cube_as_cube(const TermList &cube);
+    ///< add a cube to the solver
+
     void add_disjunct_cubes(const std::vector<TermList> &cubes);
     ///< add disjunction of all cubes in the SMT solver
 

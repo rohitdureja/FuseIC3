@@ -101,6 +101,14 @@ bool FamilyIC3::prove()
     if(initial_invariant_check())
         return true;
 
+    // find minimal subclause of last known invariant that is inductive
+    // in the current model.
+    //
+    // The implementation follows the description in the paper
+    // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
+    //   Formal Verification of Hardware. FMCAD 2011
+    std::vector<TermList> minimal_invariant;
+    std::cout << invariant_finder(minimal_invariant) << std::endl;
 
     if (!check_init()) {
         return false;
@@ -121,6 +129,7 @@ bool FamilyIC3::prove()
         new_frame();
         if (propagate()) {
             model_count_ += 1;
+            std::cout << invariant_finder(minimal_invariant) << std::endl;
             return true;
         }
     }
@@ -185,6 +194,27 @@ bool FamilyIC3::initial_invariant_check()
         if (!initiation_check(last_invariant_) &&
                 !consecution_check(last_invariant_))
             std::cout << "here" << std::endl;
+            return true;
+    }
+    return false;
+}
+
+// method to find minimal inductive subclause from last known invariant
+bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
+{
+    if(model_count_ > 0 && !last_invariant_.empty()) {
+
+        // copy last known invariant to temp
+        inv = last_invariant_;
+
+        // at this point temp is a vector of cubes. since we are interested
+        // in clauses, we use negation in all operations
+
+        // remove clauses not in init.
+        remove_clauses_violating_init(inv);
+
+        // find minimal inductive subclause
+        if(find_minimal_inductive_subclause(inv))
             return true;
     }
     return false;
@@ -852,6 +882,117 @@ bool FamilyIC3::consecution_check(const std::vector<TermList> &inv)
     solver_.pop();
 
     return sat;
+}
+
+void FamilyIC3::remove_clauses_violating_init(std::vector<TermList> &cubes)
+{
+    std::vector<TermList> good_cubes; // temp to hold sat cubes
+    good_cubes.clear();
+
+    for(TermList cube : cubes) {
+        // activate init
+        activate_frame(0);
+        activate_trans_bad(false, false);
+
+        // create temporary assertion
+        solver_.pop();
+
+        // add !cube
+        // Note: c is vector of cubes. we have to check satisfiability of I & !cl,
+        // where cl is the clause being considered. since c has cubes already, we
+        // directly add it to the solver. therefore, !cl = cube.
+        solver_.add_cube_as_cube(cube);
+
+        // check satisfiability
+        bool sat = solve();
+
+        if(!sat)
+            good_cubes.push_back(cube);
+
+        solver_.push();
+    }
+
+    // swap
+    cubes = good_cubes;
+}
+
+bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
+{
+    std::vector<TermList> temp;
+    temp = cubes;
+
+    std::vector<msat_term> x_labels;
+    std::vector<msat_term> y_labels;
+
+    // create temporary instance
+    solver_.push();
+
+    for(Cube c : cubes) {
+        // introduce auxiliary variables for each clause
+        msat_term x_label = make_label("x");
+        msat_term y_label = make_label("y");
+
+        // generate shifted copy of c
+        Cube cprimed = get_next(c);
+
+        // add the clause (!x | c) (equivalent to x => c)
+        solver_.add_cube_as_clause(c, x_label);
+
+        // for each literal a in the clause c', add clause (y | !a)
+        // to the solver. equivalent to (c' => y)
+        for(msat_term lit : cprimed) {
+            solver_.add(y_label, lit);
+        }
+
+        x_labels.push_back(x_label);
+        y_labels.push_back(y_label);
+    }
+
+    uint32_t iter = 0;
+    while(!temp.empty()) {
+
+        // add x_labels as assumptions
+        for(msat_term label : x_labels)
+            solver_.assume(label);
+
+
+        // create expression of the form (!y1 | !y2 | ... | !yk) from y_labels
+        msat_term t = msat_make_false(ts_.get_env());
+        for(msat_term y : y_labels) {
+            t = msat_make_or(ts_.get_env(), t, msat_make_not(ts_.get_env(), y));
+        }
+
+        // create temporary instance
+        solver_.push();
+        solver_.add(t);
+
+        bool sat = solve();
+
+        solver_.pop();
+        if(!sat) {
+            // found minimal subclause
+            std::cout << "here" << std::endl;
+            cubes = temp;
+            solver_.pop();
+            return true;
+        }
+        else {
+            for(uint32_t i = 0 ; i < y_labels.size() ; ) {
+                bool val = solver_.model_value(y_labels[i]);
+                if (!val) {
+                    // remove clause
+                    temp.erase(temp.begin()+i);
+                    x_labels.erase(x_labels.begin()+i);
+                    y_labels.erase(y_labels.begin()+i);
+                }
+                else
+                    ++i;
+            }
+        }
+        iter += 1;
+    }
+    solver_.pop();
+    return false;
 }
 
 
