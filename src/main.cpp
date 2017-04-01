@@ -23,11 +23,13 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <simple_ic3.h>
+#include <family_ic3.h>
 
 
 using namespace nexus;
 
 SimpleIC3 *simple_ic3 = NULL;
+FamilyIC3 *family_ic3 = NULL;
 
 
 /** \brief Handler for raised interrupts
@@ -170,8 +172,7 @@ Options parse_options(int argc, const char **argv)
         } else if (a == "-w") {
             ret.witness = true;
         } else if (a == "-f") {
-        	ret.family = true;
-        } else if (a == "-o") {
+            ret.family = true;
             if (i+1 < argc) {
                 std::istringstream buf(argv[i+1]);
                 int val;
@@ -193,8 +194,7 @@ Options parse_options(int argc, const char **argv)
                       << "\n\n   -v N : set verbosity level"
                       << "\n   -w : print witness"
                       << "\n   -s : stack-based proof obligation management"
-					  << "\n   -f : family mode"
-					  << "\n   -o N : set algorithm number"
+					  << "\n   -f N : enable family mode; set algorithm number"
                       << std::endl;
             exit(0);
             break;
@@ -286,14 +286,61 @@ int main(int argc, const char **argv)
             std::cout << "No algorithm number specified!" << std::endl
                       << "Specify algorithm using the -o option (use -h for help)"
                       << std::endl;
+            return 1;
         }
         else if (!(options.algorithm >=1 && options.algorithm <=12)) {
             std::cout << "Incorrect algorithm number specified!" << std::endl
                       << "Specify algorithm using the -o option (use -h for help)"
                       << std::endl;
+            return 1;
         }
         else {
             std::cout << "Using algorithm: " << options.algorithm << std::endl;
+
+            // create object to store the tr
+            TransitionSystem ts(env);
+
+            // read_ts parses the VMT file
+            if (!read_file(options, ts)) {
+                // error in reading file
+                std::cout << "ERROR reading input" << std::endl;
+                return 1;
+            }
+
+            // at this point model has been and stored in ts
+
+            // create IC3 instance
+            FamilyIC3 fic3(ts, options);
+
+            signal(SIGINT, handle_interrupt);
+
+            family_ic3 = &fic3;
+
+            // check the transition system
+            bool safe = fic3.prove();
+
+            if (options.witness) {
+                std::vector<TermList> wit;
+                if (!fic3.witness(wit)) {
+                    std::cout << "ERROR computing witness" << std::endl;
+                } else {
+                    std::cout << (safe ? "invariant" : "counterexample") << "\n";
+                    for (size_t i = 0; i < wit.size(); ++i) {
+                        TermList &w = wit[i];
+                        std::cout << ";; " << (safe ? "clause " : "step ") << i
+                                  << "\n" << (safe ? "(or" : "(and") << "\n";
+                        for (msat_term t : w) {
+                            std::cout << "  " << logterm(env, t) << "\n";
+                        }
+                        std::cout << ")\n";
+                    }
+                    std::cout.flush();
+                }
+            }
+
+            fic3.print_stats();
+
+            std::cout << (safe ? "safe" : "unsafe") << std::endl;
         }
     }
     return 0;

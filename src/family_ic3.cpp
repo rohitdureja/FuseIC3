@@ -50,12 +50,13 @@ FamilyIC3::FamilyIC3(const TransitionSystem &ts, const Options &opts):
     vp_(ts.get_env()),
     solver_(ts.get_env(), opts)
 {
+    // generate labels
     init_label_ = make_label("init");
     trans_label_ = make_label("trans");
     bad_label_ = make_label("bad");
 
+    // reset measured parameters
     last_reset_calls_ = 0;
-
     num_solve_calls_ = 0;
     num_solve_sat_calls_ = 0;
     num_solve_unsat_calls_ = 0;
@@ -78,6 +79,10 @@ FamilyIC3::FamilyIC3(const TransitionSystem &ts, const Options &opts):
     rec_block_time_ = 0;
     propagate_time_ = 0;
     total_time_ = 0;
+
+    // status of family run
+    model_count_ = 0;
+    last_checked_ = false;
 }
 
 
@@ -92,9 +97,12 @@ bool FamilyIC3::prove()
 
     initialize();
 
+//    initial_invariant_check();
+
     if (!check_init()) {
         return false;
     }
+
 
     while (true) {
         Cube bad;
@@ -108,6 +116,7 @@ bool FamilyIC3::prove()
         }
         new_frame();
         if (propagate()) {
+            initial_invariant_check();
             return true;
         }
     }
@@ -116,8 +125,12 @@ bool FamilyIC3::prove()
 
 bool FamilyIC3::witness(std::vector<TermList> &out)
 {
-    if (!wit_.empty()) {
-        std::swap(wit_, out);
+    if (!cex_.empty()) {
+        std::swap(cex_, out);
+        return true;
+    }
+    else if (!invariant_.empty()) {
+        std::swap(invariant_, out);
         return true;
     }
     return false;
@@ -154,6 +167,24 @@ void FamilyIC3::print_stats() const
 // major methods
 //-----------------------------------------------------------------------------
 
+// method to check if new model satisfies last known invariant
+bool FamilyIC3::initial_invariant_check()
+{
+    if(!last_invariant_.empty()) {
+        logger(2) << "Trying last known invariant:" << endlog;
+        for(Cube &c: last_invariant_) {
+            logcube(2, c);
+            logger(2) << endlog;
+        }
+
+        // check if last invariant is inductive in the current model
+        if (!initiation_check(last_invariant_) &&
+                !consecution_check(last_invariant_))
+            std::cout << "here" << std::endl;
+            return true;
+    }
+    return false;
+}
 
 bool FamilyIC3::check_init()
 {
@@ -165,9 +196,9 @@ bool FamilyIC3::check_init()
     bool sat = solve();
 
     if (sat) {
-        wit_.push_back(TermList());
+        cex_.push_back(TermList());
         // this is a bit more abstract than it could...
-        get_cube_from_model(wit_.back());
+        get_cube_from_model(cex_.back());
     }
 
     return !sat;
@@ -217,13 +248,13 @@ bool FamilyIC3::rec_block(const Cube &bad)
         logger(2) << endlog;
 
         if (p->idx == 0) {
-            // reached the initial states -- check whether the counterexample
-            // is real or spurious
-            std::vector<TermList> cex;
             // build the cex trace by following the chain of CTIs
-            wit_.clear();
+            last_checked_ = false;
+            last_cex_.clear();
+            cex_.clear();
             while (p) {
-                wit_.push_back(p->cube);
+                cex_.push_back(p->cube);
+                last_cex_.push_back(p->cube);
                 p = p->next;
             }
             return false;
@@ -311,14 +342,17 @@ bool FamilyIC3::propagate()
     if (k < depth()) {
         logger(2) << "fixpoint found at frame " << k << endlog;
         logger(2) << "invariant:" << endlog;
-        wit_.clear();
+        last_checked_ = true;
+        invariant_.clear();
+        last_invariant_.clear();
         for (size_t i = k+1; i < frames_.size(); ++i) {
             Frame &f = frames_[i];
             for (Cube &c : f) {
                 logcube(2, c);
                 logger(2) << endlog;
-                wit_.push_back(c);
-                for (msat_term &l : wit_.back()) {
+                invariant_.push_back(c);
+                last_invariant_.push_back(c);
+                for (msat_term &l : invariant_.back()) {
                     l = msat_make_not(ts_.get_env(), l);
                 }
             }
@@ -753,6 +787,69 @@ Logger &FamilyIC3::logcube(unsigned int level, const Cube &c)
     logger(level) << "]" << flushlog;
     return Logger::get();
 }
+
+bool FamilyIC3::initiation_check(const std::vector<TermList> &inv)
+{
+    // we have to check if (init & !inv) is unsat
+
+    // create temporary assertion
+    solver_.push();
+
+    // add !inv
+    // Note: inv is a vector of clauses stored as cubes. since we are negating
+    // we add a disjunction of all cubes in inv, which is same as adding the
+    // negation of the conjunction of a vector of clauses.
+    solver_.add_disjunct_cubes(inv);
+
+    // activate init
+    activate_frame(0);
+    activate_trans_bad(false, false);
+
+    // check satisfiability
+    bool sat = solve();
+
+    solver_.pop();
+
+    return sat;
+}
+
+bool FamilyIC3::consecution_check(const std::vector<TermList> &inv)
+{
+    // we have to check  if (inv & trans & !inv')
+
+    // activate trans
+    activate_trans_bad(true, false);
+
+    // create temporary assertion
+    solver_.push();
+
+    // add inv
+    // Note: inv is a vector of clauses stored as cubes. since we have to add
+    // inv directly to the solver, we add the conjunction of the negation of
+    // cubes. the negation is done by the function add_cube_as_clause.
+    for(TermList c: inv) {
+        solver_.add_cube_as_clause(c);
+    }
+
+    // add !inv'
+    // we first create inv' by using get_next()
+    std::vector<TermList> invp;
+    for(TermList c : inv) {
+        invp.push_back(get_next(c));
+    }
+    // Note: invp is a vector of clauses stored as cubes. since we are negating
+    // we add a disjunction of all cubes in inv, which is same as adding the
+    // negation of the conjunction of a vector of clauses.
+    solver_.add_disjunct_cubes(invp);
+
+    // check satisfiability
+    bool sat = solve();
+
+    solver_.pop();
+
+    return sat;
+}
+
 
 
 } // namespace nexus

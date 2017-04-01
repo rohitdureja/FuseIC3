@@ -49,6 +49,9 @@ public:
     void add_cube_as_clause(const TermList &cube);
     ///< like the above, when no label is needed
     
+    void add_disjunct_cubes(const std::vector<TermList> &cubes);
+    ///< add disjunction of all cubes in the SMT solver
+
     void push();
     ///< push a backtracking point in the SMT solver
     

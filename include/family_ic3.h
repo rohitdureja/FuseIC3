@@ -139,6 +139,9 @@ private:
     // major methods
     //------------------------------------------------------------------------
 
+    bool initial_invariant_check();
+    ///< check whether the model satisfies the previously found invariant
+
     bool check_init();
     ///< check whether the property is satisfied by the initial states
 
@@ -243,6 +246,12 @@ private:
     Logger &logcube(unsigned int level, const Cube &c);
     ///< logger function for cubes
 
+    bool initiation_check(const std::vector<TermList> &inv);
+    ///< check if invariant satisfies initiation, I => Inv
+
+    bool consecution_check(const std::vector<TermList> &inv);
+    ///< check if invariant satisfies consecution, Inv & T => Inv'
+
     //------------------------------------------------------------------------
     // internal state
     //------------------------------------------------------------------------
@@ -297,8 +306,11 @@ private:
     ///< if l1 is the label for pred and l2 is the label for ts_.next(pred),
     ///< then lbl2next_[l1] = l2. This is used in get_next()
 
-    std::vector<TermList> wit_;
-    ///< property witness (cex trace or inductive invariant)
+    std::vector<TermList> cex_;
+    ///< counterexample trace if property failed
+
+    std::vector<TermList> invariant_;
+    ///< inductive invariant if property passed
 
     Cube tmp_; ///< temporary storage used by cube generalization methods
 
@@ -307,6 +319,18 @@ private:
     ///< generalize()
 
     uint32_t last_reset_calls_; ///< number of SMT queries since last reset
+
+    uint32_t model_count_;
+    ///< count of models checked
+
+    bool last_checked_;
+    ///< result from previous run of verification
+
+    std::vector<TermList> last_cex_;
+    ///< cex from previous run of verification
+
+    std::vector<TermList> last_invariant_;
+    ///< invariant from previous run of verification
 
     //------------------------------------------------------------------------
     // statistics

@@ -96,6 +96,19 @@ void Solver::add_cube_as_clause(const TermList &cube)
     add_cube_as_clause(cube, label);
 }
 
+void Solver::add_disjunct_cubes(const std::vector<TermList> &cubes)
+{
+    msat_term expr = msat_make_false(env_);
+    for (TermList cube: cubes) {
+        msat_term c = msat_make_true(env_);
+        for(msat_term lit : cube) {
+            c = msat_make_and(env_, c, lit);
+        }
+        expr = msat_make_or(env_, expr, c);
+    }
+    msat_assert_formula(env_, expr);
+}
+
 
 void Solver::assume(msat_term a)
 {
