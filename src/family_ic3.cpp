@@ -102,7 +102,7 @@ bool FamilyIC3::prove()
         return true;
 
     // find minimal subclause of last known invariant that is inductive
-    // in the current model.
+    // with respect to the current model.
     //
     // The implementation follows the description in the paper
     // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
@@ -113,7 +113,6 @@ bool FamilyIC3::prove()
     if (!check_init()) {
         return false;
     }
-
 
     while (true) {
         Cube bad;
@@ -129,7 +128,6 @@ bool FamilyIC3::prove()
         new_frame();
         if (propagate()) {
             model_count_ += 1;
-            std::cout << invariant_finder(minimal_invariant) << std::endl;
             return true;
         }
     }

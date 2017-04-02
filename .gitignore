@@ -1,6 +1,17 @@
+# eclipse folders
 /Debug/
+
+# cmake build folder
 /build/
+
+# eclipse settings
 .project
 .settings
 .cproject
+
+# object files
 *.o
+
+# doxygen documentation
+/docs/latex/
+/docs/html/
