@@ -56,7 +56,7 @@ struct Options {
         family = false;
         witness = false;
         filename = "";
-        stack = false;
+        stack = true;
         algorithm = 0;
     }
 };

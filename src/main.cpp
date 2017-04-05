@@ -25,6 +25,8 @@
 #include <simple_ic3.h>
 #include <family_ic3.h>
 
+#define VERSION "0.0.1a"
+
 
 using namespace nexus;
 
@@ -187,15 +189,26 @@ Options parse_options(int argc, const char **argv)
                 ok = false;
                 break;
             }
-        } else if (a == "-s") {
-            ret.stack = true;
+        } else if (a == "-p") {
+            ret.stack = false;
         } else if (a == "-h" || a == "-help" || a == "--help") {
-            std::cout << "USAGE: " << argv[0] << " [OPTIONS] FILENAME.vmt"
-                      << "\n\n   -v N : set verbosity level"
-                      << "\n   -w : print witness"
-                      << "\n   -s : stack-based proof obligation management"
-					  << "\n   -f N : enable family mode; set algorithm number"
-                      << std::endl;
+            std::cout << "Nexus Model Checker [" << VERSION << "]"
+                      << "\nUsage: \t" << argv[0] << " [options] folder\n"
+                      << "\n Algorithm options"
+                      << "\n   -p           priority-queue proof obligation management (default: false)"
+                      << "\n                if not enabled, a stack-based approach is used"
+					  << "\n   -f number    enable family mode; set algorithm number between 1...12 (default: disabled)"
+					  << "\n   folder       path of folder containing .vmt files to check (required)"
+					  << "\n\n Miscellaneous"
+                      << "\n   -v level     set verbosity level (default: 0)"
+                      << "\n   -w           print witness (default: false)"
+					  << "\n   -h, --help   display this message\n"
+					  << "\n\n Example usage scenarios"
+					  << "\n " << argv[0] << " folder             runs simple algorithm on files in folder"
+					  << "\n " << argv[0] << " -p folder          runs simple algorithm using priority queues on files in folder"
+					  << "\n " << argv[0] << " -f 10 folder       runs family algorithm number 10 on files in folder"
+					  << "\n " << argv[0] << " -p -f 2 folder     runs family algorithm number 2 using priority queues on files in folder"
+                      << std::endl << std::endl;
             exit(0);
             break;
         } else if (a[0] != '-' && ret.filename.empty()) {
@@ -303,7 +316,7 @@ int main(int argc, const char **argv)
             // read_ts parses the VMT file
             if (!read_file(options, ts)) {
                 // error in reading file
-                std::cout << "ERROR reading input" << std::endl;
+                std::cout << "Error reading input (use -h for help)" << std::endl;
                 return 1;
             }
 
