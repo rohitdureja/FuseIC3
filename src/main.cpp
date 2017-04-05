@@ -24,13 +24,17 @@
 #include <signal.h>
 #include <simple_ic3.h>
 #include <family_ic3.h>
+#include <dirent.h>
+#include <algorithm>
+#include <unistd.h>
+#include <string.h>
 
 #define VERSION "0.0.1a"
 
 
 using namespace nexus;
 
-SimpleIC3 *simple_ic3 = NULL;
+// pointer to algorithm instances
 FamilyIC3 *family_ic3 = NULL;
 
 
@@ -44,8 +48,8 @@ FamilyIC3 *family_ic3 = NULL;
  */
 void handle_interrupt(int signo)
 {
-    if (simple_ic3) {
-        simple_ic3->print_stats();
+    if (family_ic3) {
+        family_ic3->print_stats();
     }
     std::cout 	<< "interrupted by signal " << signo << "\nunknown"
     			<< std::endl;
@@ -87,6 +91,8 @@ bool read_file(const Options &opts, TransitionSystem &ts)
 
     // error in opening file
     if (!file) {
+        std::cout << "Error in opening file" << std::endl;
+        std::cout << strerror(errno) << std::endl;
         return false;
     }
 
@@ -94,8 +100,12 @@ bool read_file(const Options &opts, TransitionSystem &ts)
     int err = msat_annotated_list_from_smtlib2_file(ts.get_env(), file, &n,
                                                     &terms, &annots);
 
+    // close the file
+    fclose(file);
+
     // if error in reading file
     if (err) {
+        std::cout << "parsing error" << std::endl;
         return false;
     }
 
@@ -243,118 +253,214 @@ int main(int argc, const char **argv)
     // delete mathsat environment
     EnvDeleter del_env(env);
 
-    if(options.family == false) {
-        // run normal IC3
+    // open folder
+    DIR *dir;
+    struct dirent *ent;
 
-		// create object to store the tr
-		TransitionSystem ts(env);
+    // vector to store files
+    std::vector<std::string> files;
 
-		// read_ts parses the VMT file
-		if (!read_file(options, ts)) {
-			// error in reading file
-			std::cout << "ERROR reading input" << std::endl;
-			return 1;
-		}
-
-		// at this point model has been and stored in ts
-
-		// create IC3 instance
-		SimpleIC3 ic3(ts, options);
-
-		signal(SIGINT, handle_interrupt);
-
-		simple_ic3 = &ic3;
-
-		// check the transition system
-		bool safe = ic3.prove();
-
-		if (options.witness) {
-			std::vector<TermList> wit;
-			if (!ic3.witness(wit)) {
-				std::cout << "ERROR computing witness" << std::endl;
-			} else {
-				std::cout << (safe ? "invariant" : "counterexample") << "\n";
-				for (size_t i = 0; i < wit.size(); ++i) {
-					TermList &w = wit[i];
-					std::cout << ";; " << (safe ? "clause " : "step ") << i
-							  << "\n" << (safe ? "(or" : "(and") << "\n";
-					for (msat_term t : w) {
-						std::cout << "  " << logterm(env, t) << "\n";
-					}
-					std::cout << ")\n";
-				}
-				std::cout.flush();
-			}
-		}
-
-		ic3.print_stats();
-
-		std::cout << (safe ? "safe" : "unsafe") << std::endl;
+    // parse directory and retrieve files ending in .vmt
+    if((dir = opendir(options.filename.c_str())) != nullptr) {
+        // print all files in the directory
+        while((ent = readdir(dir)) != NULL) {
+            std::string file = ent->d_name;
+            if (file.find(".vmt") != std::string::npos)
+                files.push_back(file);
+        }
+        closedir(dir);
+    } else {
+        std::cout << "No such file or directory" << std::endl;
+        exit(1);
     }
-    else if (options.family == true) {
-        // run family IC3
+    logger(1) << "Folder read statistics"
+              << "\nFolder name : " << options.filename
+              << "\nFiles read  : " << files.size() << endlog;
 
-        std::cout << "Now running Family IC3." << std::endl;
-        if (options.algorithm == 0) {
-            std::cout << "No algorithm number specified!" << std::endl
-                      << "Specify algorithm using the -o option (use -h for help)"
-                      << std::endl;
-            return 1;
+    // sort files by filename
+    std::sort(files.begin(), files.end());
+
+
+    // get current working directory
+    std::string cwd = get_current_dir_name();
+
+    // change directory
+    if(chdir(options.filename.c_str()) < 0) {
+        std::cout << "Can't read/write in directory " << options.filename << std::endl;
+        exit(-1);
+    }
+
+    // create algorithm object
+    FamilyIC3 fic3(env, options);
+    family_ic3 = &fic3;
+
+    // start reading files and running algorithm
+    for(std::string file : files) {
+
+        logger(1) << "Checking file: " << file << endlog;
+
+        // set file to current file
+        options.filename = file;
+
+        // reset mathsat env
+        msat_reset_env(env);
+
+        // create object to store transition system
+        TransitionSystem ts(env);
+
+        // read_ts parses the VMT file
+        if (!read_file(options, ts)) {
+            // error in reading file
+            std::cout << "Error reading input from file: " << options.filename << std::endl;
+            exit(-1);
         }
-        else if (!(options.algorithm >=1 && options.algorithm <=12)) {
-            std::cout << "Incorrect algorithm number specified!" << std::endl
-                      << "Specify algorithm using the -o option (use -h for help)"
-                      << std::endl;
-            return 1;
-        }
-        else {
-            std::cout << "Using algorithm: " << options.algorithm << std::endl;
 
-            // create object to store the tr
-            TransitionSystem ts(env);
+        // configure algorithm instance with current model
+        fic3.configure(&ts);
 
-            // read_ts parses the VMT file
-            if (!read_file(options, ts)) {
-                // error in reading file
-                std::cout << "Error reading input (use -h for help)" << std::endl;
-                return 1;
-            }
+        // check the transition system
+        bool safe = fic3.prove();
 
-            // at this point model has been and stored in ts
-
-            // create IC3 instance
-            FamilyIC3 fic3(ts, options);
-
-            signal(SIGINT, handle_interrupt);
-
-            family_ic3 = &fic3;
-
-            // check the transition system
-            bool safe = fic3.prove();
-
-            if (options.witness) {
-                std::vector<TermList> wit;
-                if (!fic3.witness(wit)) {
-                    std::cout << "ERROR computing witness" << std::endl;
-                } else {
-                    std::cout << (safe ? "invariant" : "counterexample") << "\n";
-                    for (size_t i = 0; i < wit.size(); ++i) {
-                        TermList &w = wit[i];
-                        std::cout << ";; " << (safe ? "clause " : "step ") << i
-                                  << "\n" << (safe ? "(or" : "(and") << "\n";
-                        for (msat_term t : w) {
-                            std::cout << "  " << logterm(env, t) << "\n";
-                        }
-                        std::cout << ")\n";
+        if (options.witness) {
+            std::vector<TermList> wit;
+            if (!fic3.witness(wit)) {
+                std::cout << "ERROR computing witness" << std::endl;
+            } else {
+                std::cout << (safe ? "invariant" : "counterexample") << "\n";
+                for (size_t i = 0; i < wit.size(); ++i) {
+                    TermList &w = wit[i];
+                    std::cout << ";; " << (safe ? "clause " : "step ") << i
+                              << "\n" << (safe ? "(or" : "(and") << "\n";
+                    for (msat_term t : w) {
+                        std::cout << "  " << logterm(env, t) << "\n";
                     }
-                    std::cout.flush();
+                    std::cout << ")\n";
                 }
+                std::cout.flush();
             }
-
-            fic3.print_stats();
-
-            std::cout << (safe ? "safe" : "unsafe") << std::endl;
         }
+
+        fic3.print_stats();
+
+        std::cout << (safe ? "safe" : "unsafe") << std::endl;
+
     }
+
+
+
+
+//    if(options.family == false) {
+//        // run normal IC3
+//
+//		// create object to store the tr
+//		TransitionSystem ts(env);
+//
+//		// read_ts parses the VMT file
+//		if (!read_file(options, ts)) {
+//			// error in reading file
+//			std::cout << "ERROR reading input" << std::endl;
+//			return 1;
+//		}
+//
+//		// at this point model has been and stored in ts
+//
+//		// create IC3 instance
+//		SimpleIC3 ic3(ts, options);
+//
+//		signal(SIGINT, handle_interrupt);
+//
+//		simple_ic3 = &ic3;
+//
+//		// check the transition system
+//		bool safe = ic3.prove();
+//
+//		if (options.witness) {
+//			std::vector<TermList> wit;
+//			if (!ic3.witness(wit)) {
+//				std::cout << "ERROR computing witness" << std::endl;
+//			} else {
+//				std::cout << (safe ? "invariant" : "counterexample") << "\n";
+//				for (size_t i = 0; i < wit.size(); ++i) {
+//					TermList &w = wit[i];
+//					std::cout << ";; " << (safe ? "clause " : "step ") << i
+//							  << "\n" << (safe ? "(or" : "(and") << "\n";
+//					for (msat_term t : w) {
+//						std::cout << "  " << logterm(env, t) << "\n";
+//					}
+//					std::cout << ")\n";
+//				}
+//				std::cout.flush();
+//			}
+//		}
+//
+//		ic3.print_stats();
+//
+//		std::cout << (safe ? "safe" : "unsafe") << std::endl;
+//    }
+//    else if (options.family == true) {
+//        // run family IC3
+//
+//        std::cout << "Now running Family IC3." << std::endl;
+//        if (options.algorithm == 0) {
+//            std::cout << "No algorithm number specified!" << std::endl
+//                      << "Specify algorithm using the -o option (use -h for help)"
+//                      << std::endl;
+//            return 1;
+//        }
+//        else if (!(options.algorithm >=1 && options.algorithm <=12)) {
+//            std::cout << "Incorrect algorithm number specified!" << std::endl
+//                      << "Specify algorithm using the -o option (use -h for help)"
+//                      << std::endl;
+//            return 1;
+//        }
+//        else {
+//            std::cout << "Using algorithm: " << options.algorithm << std::endl;
+//
+//            // create object to store the tr
+//            TransitionSystem ts(env);
+//
+//            // read_ts parses the VMT file
+//            if (!read_file(options, ts)) {
+//                // error in reading file
+//                std::cout << "Error reading input (use -h for help)" << std::endl;
+//                return 1;
+//            }
+//
+//            // at this point model has been and stored in ts
+//
+//            // create IC3 instance
+//            FamilyIC3 fic3(ts, options);
+//
+//            signal(SIGINT, handle_interrupt);
+//
+//            family_ic3 = &fic3;
+//
+//            // check the transition system
+//            bool safe = fic3.prove();
+//
+//            if (options.witness) {
+//                std::vector<TermList> wit;
+//                if (!fic3.witness(wit)) {
+//                    std::cout << "ERROR computing witness" << std::endl;
+//                } else {
+//                    std::cout << (safe ? "invariant" : "counterexample") << "\n";
+//                    for (size_t i = 0; i < wit.size(); ++i) {
+//                        TermList &w = wit[i];
+//                        std::cout << ";; " << (safe ? "clause " : "step ") << i
+//                                  << "\n" << (safe ? "(or" : "(and") << "\n";
+//                        for (msat_term t : w) {
+//                            std::cout << "  " << logterm(env, t) << "\n";
+//                        }
+//                        std::cout << ")\n";
+//                    }
+//                    std::cout.flush();
+//                }
+//            }
+//
+//            fic3.print_stats();
+//
+//            std::cout << (safe ? "safe" : "unsafe") << std::endl;
+//        }
+//    }
     return 0;
 }

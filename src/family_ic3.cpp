@@ -44,11 +44,11 @@
 
 namespace nexus {
 
-FamilyIC3::FamilyIC3(const TransitionSystem &ts, const Options &opts):
-    ts_(ts),
+FamilyIC3::FamilyIC3(const msat_env &env, const Options &opts):
+    ts_(nullptr),
     opts_(opts),
-    vp_(ts.get_env()),
-    solver_(ts.get_env(), opts)
+    vp_(env),
+    solver_(env, opts)
 {
     // generate labels
     init_label_ = make_label("init");
@@ -89,6 +89,15 @@ FamilyIC3::FamilyIC3(const TransitionSystem &ts, const Options &opts):
 //-----------------------------------------------------------------------------
 // public methods
 //-----------------------------------------------------------------------------
+
+void FamilyIC3::configure(const TransitionSystem *ts) {
+
+    if(!opts_.family)
+        // clean up context
+        hard_reset();
+
+    ts_ = ts;
+}
 
 bool FamilyIC3::prove()
 {
@@ -385,7 +394,7 @@ bool FamilyIC3::propagate()
                 invariant_.push_back(c);
                 last_invariant_.push_back(c);
                 for (msat_term &l : invariant_.back()) {
-                    l = msat_make_not(ts_.get_env(), l);
+                    l = msat_make_not(ts_->get_env(), l);
                 }
             }
         }
@@ -501,7 +510,7 @@ void FamilyIC3::generalize(Cube &c, unsigned int &idx)
         if (gen_needed_.find(l) == gen_needed_.end()) {
             auto it = tmp_.erase(tmp_.begin()+i);
 
-            logger(3) << "trying to drop " << logterm(ts_.get_env(), l)
+            logger(3) << "trying to drop " << logterm(ts_->get_env(), l)
                       << endlog;
 
             if (is_initial(tmp_) || !block(tmp_, idx, &tmp_, false)) {
@@ -541,27 +550,27 @@ void FamilyIC3::push(Cube &c, unsigned int &idx)
 
 void FamilyIC3::initialize()
 {
-    for (msat_term v : ts_.statevars()) {
-        if (msat_term_is_boolean_constant(ts_.get_env(), v)) {
+    for (msat_term v : ts_->statevars()) {
+        if (msat_term_is_boolean_constant(ts_->get_env(), v)) {
             state_vars_.push_back(v);
             // fill the maps lbl2next_ and lbl2next_ also for Boolean state
             // vars. This makes the implementation of get_next() and refine()
             // simpler, as we do not need to check for special cases
-            lbl2next_[v] = ts_.next(v);
+            lbl2next_[v] = ts_->next(v);
         }
     }
 
-    solver_.add(ts_.init(), init_label_);
-    solver_.add(ts_.trans(), trans_label_);
-    msat_term bad = lit(ts_.prop(), true);
+    solver_.add(ts_->init(), init_label_);
+    solver_.add(ts_->trans(), trans_label_);
+    msat_term bad = lit(ts_->prop(), true);
     solver_.add(bad, bad_label_);
 
     // the first frame is init
     frames_.push_back(Frame());
     frame_labels_.push_back(init_label_);
 
-    logger(1) << "initialized IC3: " << ts_.statevars().size() << " state vars,"
-              << " " << ts_.inputvars().size() << " input vars " << endlog;
+    logger(1) << "initialized IC3: " << ts_->statevars().size() << " state vars,"
+              << " " << ts_->inputvars().size() << " input vars " << endlog;
 }
 
 
@@ -762,6 +771,24 @@ bool FamilyIC3::solve()
 }
 
 
+void FamilyIC3::hard_reset()
+{
+    // reset solver
+    solver_.reset();
+
+    // reset internal state
+    frames_.clear();
+    frame_labels_.clear();
+    state_vars_.clear();
+    lbl2next_.clear();
+    cex_.clear();
+    invariant_.clear();
+    tmp_.clear();
+    gen_needed_.clear();
+    last_reset_calls_ = 0;
+    last_checked_ = false;
+}
+
 void FamilyIC3::reset_solver()
 {
     logger(2) << "resetting SMT solver" << endlog;
@@ -770,9 +797,9 @@ void FamilyIC3::reset_solver()
     last_reset_calls_ = num_solve_calls_;
 
     // re-add initial states, transition relation and bad states
-    solver_.add(ts_.init(), init_label_);
-    solver_.add(ts_.trans(), trans_label_);
-    msat_term bad = lit(ts_.prop(), true);
+    solver_.add(ts_->init(), init_label_);
+    solver_.add(ts_->trans(), trans_label_);
+    msat_term bad = lit(ts_->prop(), true);
     solver_.add(bad, bad_label_);
 
     // re-add all the clauses in the frames
@@ -799,13 +826,13 @@ inline msat_term FamilyIC3::make_label(const char *name)
 
 inline msat_term FamilyIC3::var(msat_term t)
 {
-    return nexus::var(ts_.get_env(), t);
+    return nexus::var(ts_->get_env(), t);
 }
 
 
 inline msat_term FamilyIC3::lit(msat_term t, bool neg)
 {
-    return nexus::lit(ts_.get_env(), t, neg);
+    return nexus::lit(ts_->get_env(), t, neg);
 }
 
 
@@ -814,7 +841,7 @@ Logger &FamilyIC3::logcube(unsigned int level, const Cube &c)
     logger(level) << "[ ";
     for (msat_term l : c) {
         msat_term v = var(l);
-        logger(level) << (l == v ? "" : "~") << logterm(ts_.get_env(), v) <<" ";
+        logger(level) << (l == v ? "" : "~") << logterm(ts_->get_env(), v) <<" ";
     }
     logger(level) << "]" << flushlog;
     return Logger::get();
@@ -955,9 +982,9 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
 
 
         // create expression of the form (!y1 | !y2 | ... | !yk) from y_labels
-        msat_term t = msat_make_false(ts_.get_env());
+        msat_term t = msat_make_false(ts_->get_env());
         for(msat_term y : y_labels) {
-            t = msat_make_or(ts_.get_env(), t, msat_make_not(ts_.get_env(), y));
+            t = msat_make_or(ts_->get_env(), t, msat_make_not(ts_->get_env(), y));
         }
 
         // create temporary instance

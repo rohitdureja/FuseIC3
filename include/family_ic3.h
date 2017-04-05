@@ -59,7 +59,7 @@ namespace nexus {
  */
 class FamilyIC3 {
 public:
-    FamilyIC3(const TransitionSystem &ts, const Options &opts);
+    FamilyIC3(const msat_env &env, const Options &opts);
 
     bool prove();
     ///< main method: check whether the property holds or not
@@ -74,6 +74,7 @@ public:
     void print_stats() const;
     ///< print search statistics on stdout
 
+    void configure(const TransitionSystem *ts);
 private:
     //------------------------------------------------------------------------
     // internal data structures
@@ -248,6 +249,9 @@ private:
     bool solve();
     ///< wrapper for Solver::check() that also updates statistics
 
+    void hard_reset();
+    ///< reset algorithm instance by flushing internal data structures
+
     void reset_solver();
     ///< reset and reinitialize the underlying SMT solver
 
@@ -284,7 +288,7 @@ private:
     // internal state
     //------------------------------------------------------------------------
 
-    const TransitionSystem &ts_; ///< the input transition system
+    const TransitionSystem  *ts_; ///< the input transition system
     const Options &opts_; ///< algorithm options
 
     VarProvider vp_; ///< provider for fresh variables
