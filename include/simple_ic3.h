@@ -1,5 +1,4 @@
-/** -*- C++ -*-
- *
+/**
  * IC3 with implicit abstraction
  * author: Alberto Griggio <griggio@fbk.eu>
  *

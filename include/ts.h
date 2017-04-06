@@ -1,5 +1,4 @@
-/** -*- C++ -*-
- * 
+/**
  * Manager for transition systems
  * author: Alberto Griggio <griggio@fbk.eu>
  * 

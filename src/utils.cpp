@@ -1,5 +1,4 @@
-/** -*- C++ -*-
- * 
+/**
  * Basic utils and definitions
  * author: Alberto Griggio <griggio@fbk.eu>
  * 

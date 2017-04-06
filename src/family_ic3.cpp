@@ -1,8 +1,9 @@
 /*
  * This file is part of Nexus Model Checker.
- * author: Rohit Dureja
+ * author: Rohit Dureja <dureja at iastate dot edu>
  *
- * Copyright (C) 2017 Iowa State University
+ * Copyright (C) 2017 Rohit Dureja,
+ *                    Iowa State University
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,6 +41,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <fstream>
 
 
 namespace nexus {
@@ -107,17 +109,19 @@ bool FamilyIC3::prove()
     initialize();
 
     // check if last found invariant is valid in the new model
-    if(initial_invariant_check())
-        return true;
+    if(opts_.family) {
+        if(initial_invariant_check())
+            return true;
 
-    // find minimal subclause of last known invariant that is inductive
-    // with respect to the current model.
-    //
-    // The implementation follows the description in the paper
-    // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
-    //   Formal Verification of Hardware. FMCAD 2011
-    std::vector<TermList> minimal_invariant;
-    std::cout << invariant_finder(minimal_invariant) << std::endl;
+        // find minimal subclause of last known invariant that is inductive
+        // with respect to the current model.
+        //
+        // The implementation follows the description in the paper
+        // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
+        //   Formal Verification of Hardware. FMCAD 2011
+        std::vector<TermList> minimal_invariant;
+        std::cout << invariant_finder(minimal_invariant) << std::endl;
+    }
 
     if (!check_init()) {
         return false;
@@ -180,6 +184,43 @@ void FamilyIC3::print_stats() const
     print_stat(rec_block_time);
     print_stat(propagate_time);
     print_stat(total_time);
+}
+
+void FamilyIC3::save_stats() const
+{
+    std::ofstream xmlfile;
+    std::string fl = opts_.filename;
+    fl.erase(fl.end()-4, fl.end());
+    xmlfile.open(fl + ".log.xml");
+
+#define save_stat(name, value) \
+    xmlfile << "<" << name ">" << std::setprecision(3) << std::fixed \
+            << value ## _ << "</" << name ">" << std::endl;
+
+    xmlfile << "<statistics>" << std::endl;
+
+    save_stat("num_solve_calls", num_solve_calls);
+    save_stat("num_solve_sat_calls", num_solve_sat_calls);
+    save_stat("num_solve_unsat_calls", num_solve_unsat_calls);
+    save_stat("num_solver_reset", num_solver_reset);
+    save_stat("num_added_cubes", num_added_cubes);
+    save_stat("num_subsumed_cubes", num_subsumed_cubes);
+    save_stat("num_block", num_block);
+    save_stat("max_cube_size", max_cube_size);
+    save_stat("avg_cube_size", avg_cube_size);
+    save_stat("solve_time", solve_time);
+    save_stat("solve_sat_time", solve_sat_time);
+    save_stat("solve_unsat_time", solve_unsat_time);
+    save_stat("block_time", block_time);
+    save_stat("generalize_and_push_time", generalize_and_push_time);
+    save_stat("rec_block_time", rec_block_time);
+    save_stat("propagate_time", propagate_time);
+    save_stat("total_time", total_time);
+    xmlfile << "<result>";
+    xmlfile << (last_checked_ ? "True" : "False");
+    xmlfile << "</result>" << std::endl;
+
+    xmlfile << "</statistics>" << std::endl;
 }
 
 
@@ -787,6 +828,37 @@ void FamilyIC3::hard_reset()
     gen_needed_.clear();
     last_reset_calls_ = 0;
     last_checked_ = false;
+
+    // reset measured parameters
+    last_reset_calls_ = 0;
+    num_solve_calls_ = 0;
+    num_solve_sat_calls_ = 0;
+    num_solve_unsat_calls_ = 0;
+
+    num_solver_reset_ = 0;
+
+    num_added_cubes_ = 0;
+    num_subsumed_cubes_ = 0;
+
+    num_block_ = 0;
+
+    max_cube_size_ = 0;
+    avg_cube_size_ = 0;
+
+    solve_time_ = 0;
+    solve_sat_time_ = 0;
+    solve_unsat_time_ = 0;
+    block_time_ = 0;
+    generalize_and_push_time_ = 0;
+    rec_block_time_ = 0;
+    propagate_time_ = 0;
+    total_time_ = 0;
+
+    // status of family run
+    model_count_ = 0;
+    last_checked_ = false;
+
+
 }
 
 void FamilyIC3::reset_solver()

@@ -1,8 +1,9 @@
 /*
  * This file is part of Nexus Model Checker.
- * author: Rohit Dureja
+ * author: Rohit Dureja <dureja at iastate dot edu>
  *
- * Copyright (C) 2017 Iowa State University
+ * Copyright (C) 2017 Rohit Dureja,
+ *                    Iowa State University
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

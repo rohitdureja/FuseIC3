@@ -1,8 +1,9 @@
 /*
  * This file is part of Nexus Model Checker.
- * author: Rohit Dureja
+ * author: Rohit Dureja <dureja at iastate dot edu>
  *
- * Copyright (C) 2017 Iowa State University
+ * Copyright (C) 2017 Rohit Dureja,
+ *                    Iowa State University
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,15 +48,10 @@
 namespace nexus {
 
 /**
- * A simple implementation of the IC3 algorithm, using Implicit Predicate
- * Abstraction for handling infinite-state systems. Aimed at simplicity,
- * conciseness, and ease of understanding rather than at raw
- * performance. Despite this, it is reasonably competitive for infinite-state
- * systems (not so much for purely Boolean systems).
+ * A simple implementation of the IC3 algorithm for model families. Aimed at
+ * simplicity, conciseness, and ease of understanding rather than at raw
+ * performance.
  *
- * The implementation follows the description of the paper:
- * - Een, Mischenko, Brayton: Efficient Implementation of Property-Directed
- *   Reachability. FMCAD'11
  */
 class FamilyIC3 {
 public:
@@ -75,6 +71,13 @@ public:
     ///< print search statistics on stdout
 
     void configure(const TransitionSystem *ts);
+    ///< configure the algorithm object with a new transition system/model
+    ///< helps keep reusing the same object, and therefore, old internal
+    ///< data structures.
+
+    void save_stats() const;
+    ///< save the algorithm statistics as an xml file in the current directory
+
 private:
     //------------------------------------------------------------------------
     // internal data structures
