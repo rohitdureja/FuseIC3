@@ -164,6 +164,11 @@ Options parse_options(int argc, const char **argv)
     Options ret;
 
     bool ok = true;
+    if(argc < 2) {
+        std::cout << "No command-line options specified (use -h for help)"
+                  << std::endl;
+        exit(-1);
+    }
     for (int i = 1; i < argc; ++i) {
         std::string a(argv[i]);
         if (a == "-v") {
