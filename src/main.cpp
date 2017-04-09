@@ -293,7 +293,8 @@ int main(int argc, const char **argv)
 
     // change directory
     if(chdir(options.filename.c_str()) < 0) {
-        std::cout << "Can't read/write in directory " << options.filename << std::endl;
+        std::cout << "Can't read/write in directory "
+                  << options.filename << std::endl;
         exit(-1);
     }
 
@@ -318,7 +319,8 @@ int main(int argc, const char **argv)
         // read_ts parses the VMT file
         if (!read_file(options, ts)) {
             // error in reading file
-            std::cout << "Error reading input from file: " << options.filename << std::endl;
+            std::cout << "Error reading input from file: "
+                      << options.filename << std::endl;
             exit(-1);
         }
 
@@ -351,6 +353,8 @@ int main(int argc, const char **argv)
         fic3.save_stats();
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
+
+        getchar();
 
     }
 

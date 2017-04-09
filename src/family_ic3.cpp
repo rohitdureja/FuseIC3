@@ -94,9 +94,12 @@ FamilyIC3::FamilyIC3(const msat_env &env, const Options &opts):
 
 void FamilyIC3::configure(const TransitionSystem *ts) {
 
-    if(!opts_.family)
-        // clean up context
+    if(!opts_.family) {
         hard_reset();
+    }
+    else {
+        soft_reset();
+    }
 
     ts_ = ts;
 }
@@ -240,9 +243,10 @@ bool FamilyIC3::initial_invariant_check()
 
         // check if last invariant is inductive in the current model
         if (!initiation_check(last_invariant_) &&
-                !consecution_check(last_invariant_))
-            std::cout << "here" << std::endl;
+                !consecution_check(last_invariant_)) {
+            invariant_ = last_invariant_;
             return true;
+        }
     }
     return false;
 }
@@ -506,6 +510,8 @@ bool FamilyIC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_c
         } else {
             solver_.pop();
         }
+
+
 
         return true;
     } else {
@@ -858,8 +864,27 @@ void FamilyIC3::hard_reset()
     model_count_ = 0;
     last_checked_ = false;
 
-
 }
+
+
+void FamilyIC3::soft_reset()
+{
+    // reset solver
+    solver_.reset();
+
+    // reset internal state
+    frames_.clear();
+    frame_labels_.clear();
+    state_vars_.clear();
+    lbl2next_.clear();
+    cex_.clear();
+    invariant_.clear();
+    tmp_.clear();
+    gen_needed_.clear();
+    last_reset_calls_ = 0;
+    last_checked_ = false;
+}
+
 
 void FamilyIC3::reset_solver()
 {
@@ -934,6 +959,7 @@ bool FamilyIC3::initiation_check(const std::vector<TermList> &inv)
 
     // activate init
     activate_frame(0);
+
     activate_trans_bad(false, false);
 
     // check satisfiability
@@ -992,7 +1018,7 @@ void FamilyIC3::remove_clauses_violating_init(std::vector<TermList> &cubes)
         activate_trans_bad(false, false);
 
         // create temporary assertion
-        solver_.pop();
+        solver_.push();
 
         // add !cube
         // Note: c is vector of cubes. we have to check satisfiability of I & !cl,
@@ -1006,7 +1032,7 @@ void FamilyIC3::remove_clauses_violating_init(std::vector<TermList> &cubes)
         if(!sat)
             good_cubes.push_back(cube);
 
-        solver_.push();
+        solver_.pop();
     }
 
     // swap
@@ -1045,8 +1071,10 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
         y_labels.push_back(y_label);
     }
 
+
     uint32_t iter = 0;
     while(!temp.empty()) {
+        std::cout << temp.size() << std::endl;
 
         // add x_labels as assumptions
         for(msat_term label : x_labels)
@@ -1065,10 +1093,9 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
 
         bool sat = solve();
 
-        solver_.pop();
+
         if(!sat) {
             // found minimal subclause
-            std::cout << "here" << std::endl;
             cubes = temp;
             solver_.pop();
             return true;
@@ -1076,6 +1103,7 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
         else {
             for(uint32_t i = 0 ; i < y_labels.size() ; ) {
                 bool val = solver_.model_value(y_labels[i]);
+
                 if (!val) {
                     // remove clause
                     temp.erase(temp.begin()+i);
@@ -1086,6 +1114,7 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
                     ++i;
             }
         }
+        solver_.pop();
         iter += 1;
     }
     solver_.pop();

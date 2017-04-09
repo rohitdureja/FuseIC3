@@ -255,6 +255,10 @@ private:
     void hard_reset();
     ///< reset algorithm instance by flushing internal data structures
 
+    void soft_reset();
+    ///< reset algorithm instance by partially flushing internal data
+    ///< structures. this method doesn't clear last stored frames.
+
     void reset_solver();
     ///< reset and reinitialize the underlying SMT solver
 

@@ -138,6 +138,7 @@ void Solver::add_disjunct_cubes(const std::vector<TermList> &cubes)
         }
         expr = msat_make_or(env_, expr, c);
     }
+    std::cout << logterm(env_, expr) << std::endl;
     msat_assert_formula(env_, expr);
 }
 
