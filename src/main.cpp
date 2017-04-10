@@ -213,16 +213,26 @@ Options parse_options(int argc, const char **argv)
                       << "\n Algorithm options"
                       << "\n   -p           priority-queue proof obligation management (default: false)"
                       << "\n                if not enabled, a stack-based approach is used"
-					  << "\n   -f number    enable family mode; set algorithm number between 1...12 (default: disabled)"
+					  << "\n   -f number    enable family mode; set algorithm number between [1...4] (default: disabled)"
 					  << "\n   folder       path of folder containing .vmt files to check (required)"
 					  << "\n\n Miscellaneous"
                       << "\n   -v level     set verbosity level (default: 0)"
                       << "\n   -w           print witness (default: false)"
 					  << "\n   -h, --help   display this message\n"
+					  << "\n\n Available family checking algorithms"
+					  << "\n (supplied as argument with -f options)"
+					  << "\n-----------------------------------------------------------------"
+					  << "\n| Number | Algorithm                                            |"
+					  << "\n-----------------------------------------------------------------"
+					  << "\n|   1    | Algorithm by Chockler et al. (FMCAD 2011)            |"
+					  << "\n|   2    | Basic Check (re-use and check last invariant)        |"
+					  << "\n|   3    | Basic Check + Lavish Frame Repair (drop clauses)     |"
+					  << "\n|   4    | Basic Check + Sensible Frame Repair (repair clauses) |"
+					  << "\n-----------------------------------------------------------------"
 					  << "\n\n Example usage scenarios"
 					  << "\n " << argv[0] << " folder             runs simple algorithm on files in folder"
 					  << "\n " << argv[0] << " -p folder          runs simple algorithm using priority queues on files in folder"
-					  << "\n " << argv[0] << " -f 10 folder       runs family algorithm number 10 on files in folder"
+					  << "\n " << argv[0] << " -f 3 folder        runs family algorithm number 10 on files in folder"
 					  << "\n " << argv[0] << " -p -f 2 folder     runs family algorithm number 2 using priority queues on files in folder"
                       << std::endl << std::endl;
             exit(0);
@@ -354,7 +364,7 @@ int main(int argc, const char **argv)
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
 
-        getchar();
+//        getchar();
 
     }
 

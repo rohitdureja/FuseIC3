@@ -291,6 +291,14 @@ private:
     ///< such that c & T => c'. Return true and replace cubes with found
     ///< sublcause, if one exists. Otherwise, return false.
 
+    void add_minimal_inductive_subclause(std::vector<TermList> &cubes);
+    ///< add the found minimal inductive subclause from the last known
+    ///< invariant to the solver. This subclause is enabled whenever a SAT
+    ///< query contain a frame.
+
+    void print_frames();
+
+
     //------------------------------------------------------------------------
     // internal state
     //------------------------------------------------------------------------
@@ -370,6 +378,13 @@ private:
 
     std::vector<TermList> last_invariant_;
     ///< invariant from previous run of verification
+
+    std::vector<Cube> minimal_subclause_;
+    ///< minimal inductive subclause from last known invariant
+
+    msat_term minimal_subclause_label_;
+    ///< activation label for minimal inductive
+
 
     //------------------------------------------------------------------------
     // statistics
