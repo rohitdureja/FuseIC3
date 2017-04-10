@@ -199,6 +199,17 @@ private:
     void push(Cube &c, unsigned int &idx);
     ///< find the highest index idx for which (~c & F[idx] & T |= ~c')
 
+    bool check_frame_invariant(unsigned int idx);
+    ///< check whether the frames invariant F[i-1] & T |= F[i] holds
+
+    void lavish_frame_repair(unsigned int idx);
+    ///< clauses in F[idx] that violate F[idx-1] & T |= F[idx]' are replaced
+    ///< with True which makes the formula UNSAT
+
+    void sensible_frame_repair(unsigned int idx);
+    ///< clauses in F[idx] that violate F[idx-1] & T |= F[idx]' are replaced
+    ///< generalized clauses which makes the formula UNSAT
+
     //------------------------------------------------------------------------
     // minor/helper methods
     //------------------------------------------------------------------------
@@ -237,7 +248,7 @@ private:
 
     void activate_frame(unsigned int idx);
     ///< activates the frame at index "idx" in the SMT solver. if idx is
-    ///< depth(), deactivates all frames
+    ///< equal to depth(), deactivates all frames
 
     void activate_trans_bad(bool trans_active, bool bad_active);
     ///< activates/deactivates the constraints for the transition relation and
@@ -384,6 +395,9 @@ private:
 
     msat_term minimal_subclause_label_;
     ///< activation label for minimal inductive
+
+    unsigned int frame_number = 0;
+    ///< maintain current active frame
 
 
     //------------------------------------------------------------------------

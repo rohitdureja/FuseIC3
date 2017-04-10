@@ -123,8 +123,6 @@ bool FamilyIC3::prove()
         if(opts_.algorithm == 1) {
             std::vector<Cube> min;
             if(invariant_finder(min)) {
-                std::cout << "sdfljsdlfjasdlfhlskdaf0" << std::endl;
-                exit(-2);
                 // add the minimal invariant to the solver
                 // it is always enabled when any frame is part of the SAT query
                 add_minimal_inductive_subclause(min);
@@ -136,8 +134,21 @@ bool FamilyIC3::prove()
         return false;
     }
 
+    // increment frame count
+    frame_number++;
+
     while (true) {
         Cube bad;
+
+        // in family algorithm 3 and 4, frame repair is performed.
+        if(opts_.algorithm > 2) {
+            // check if F[i-1] & T |= F[i]'
+            bool res = check_frame_invariant(depth());
+            if(!res && opts_.algorithm == 3)
+                lavish_frame_repair(depth());
+            else if(! res && opts_.algorithm == 4)
+                sensible_frame_repair(depth());
+        }
         while (get_bad(bad)) {
 
             if (!rec_block(bad)) {
@@ -300,7 +311,8 @@ bool FamilyIC3::check_init()
 
 bool FamilyIC3::get_bad(Cube &out)
 {
-	activate_frame(depth());
+	std::cout << "depth: " << depth() << std::endl;
+    activate_frame(depth());
     activate_bad();
 
     if (solve()) {
@@ -597,6 +609,46 @@ void FamilyIC3::push(Cube &c, unsigned int &idx)
 }
 
 
+bool FamilyIC3::check_frame_invariant(unsigned int idx)
+{
+    if (idx > 0) {
+
+        // activate trans
+        activate_trans_bad(true, false);
+
+        // activate frame F[idx-1]
+        activate_frame(idx-1);
+
+        // create temporary assertion
+        solver_.push();
+
+        for(unsigned int i = idx ; i < frames_.size() ;) {
+
+        }
+
+        solver_.pop();
+    }
+    return false;
+}
+
+void FamilyIC3::lavish_frame_repair(unsigned int idx)
+{
+
+    if(idx > 0) {
+        // find clauses responsible
+
+    }
+}
+
+void FamilyIC3::sensible_frame_repair(unsigned int idx)
+{
+    if(idx > 0) {
+
+    }
+}
+
+
+
 //-----------------------------------------------------------------------------
 // minor/helper methods
 //-----------------------------------------------------------------------------
@@ -639,7 +691,12 @@ void FamilyIC3::new_frame()
         logger(1) << endlog;
     }
 
-    frames_.push_back(Frame());
+    // increment frame count
+    frame_number++;
+
+    if(frame_number >= frames_.size())
+        frames_.push_back(Frame());
+
     frame_labels_.push_back(make_label("frame"));
 }
 
@@ -792,6 +849,7 @@ inline void FamilyIC3::activate_frame(unsigned int idx)
         solver_.assume(minimal_subclause_label_);
     }
 
+
     for (unsigned int i = 0; i < frame_labels_.size(); ++i) {
         solver_.assume(lit(frame_labels_[i], i < idx));
     }
@@ -877,6 +935,7 @@ void FamilyIC3::hard_reset()
     // status of family run
     model_count_ = 0;
     last_checked_ = false;
+    frame_number = 0;
 
 }
 
@@ -887,7 +946,7 @@ void FamilyIC3::soft_reset()
     solver_.reset();
 
     // reset internal state
-    frames_.clear();
+    //frames_.clear();
     frame_labels_.clear();
     state_vars_.clear();
     lbl2next_.clear();
@@ -898,6 +957,7 @@ void FamilyIC3::soft_reset()
     gen_needed_.clear();
     last_reset_calls_ = 0;
     last_checked_ = false;
+    frame_number = 0;
 }
 
 
@@ -926,7 +986,7 @@ void FamilyIC3::reset_solver()
 
 inline size_t FamilyIC3::depth()
 {
-    return frames_.size()-1;
+    return frame_number - 1;
 }
 
 
@@ -1156,11 +1216,11 @@ void FamilyIC3::add_minimal_inductive_subclause(std::vector<Cube> &cubes)
 
 void FamilyIC3::print_frames()
 {
-    for(int i = 0 ; i < frames_.size() ; ++i)
+    for(unsigned int i = 0 ; i < frames_.size() ; ++i)
     {
         std::vector<Cube> cubes = frames_[i];
         logger(2) << "Frame["<< i <<"]" << endlog;
-        for(int j = 0 ; j < cubes.size() ; ++j)
+        for(unsigned int j = 0 ; j < cubes.size() ; ++j)
         {
             logcube(2, cubes[j]);
             logger(2) << endlog;
