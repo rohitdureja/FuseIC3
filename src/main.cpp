@@ -23,7 +23,6 @@
 #include <iostream>
 #include <stdlib.h>
 #include <signal.h>
-#include <simple_ic3.h>
 #include <family_ic3.h>
 #include <dirent.h>
 #include <algorithm>
@@ -364,7 +363,7 @@ int main(int argc, const char **argv)
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
 
-//        getchar();
+        getchar();
 
     }
 

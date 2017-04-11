@@ -57,34 +57,7 @@ FamilyIC3::FamilyIC3(const msat_env &env, const Options &opts):
     trans_label_ = make_label("trans");
     bad_label_ = make_label("bad");
 
-    // reset measured parameters
-    last_reset_calls_ = 0;
-    num_solve_calls_ = 0;
-    num_solve_sat_calls_ = 0;
-    num_solve_unsat_calls_ = 0;
-
-    num_solver_reset_ = 0;
-
-    num_added_cubes_ = 0;
-    num_subsumed_cubes_ = 0;
-
-    num_block_ = 0;
-
-    max_cube_size_ = 0;
-    avg_cube_size_ = 0;
-
-    solve_time_ = 0;
-    solve_sat_time_ = 0;
-    solve_unsat_time_ = 0;
-    block_time_ = 0;
-    generalize_and_push_time_ = 0;
-    rec_block_time_ = 0;
-    propagate_time_ = 0;
-    total_time_ = 0;
-
-    // status of family run
-    model_count_ = 0;
-    last_checked_ = false;
+    hard_reset();
 }
 
 
@@ -141,20 +114,19 @@ bool FamilyIC3::prove()
         Cube bad;
 
         // in family algorithm 3 and 4, frame repair is performed.
-        if(opts_.algorithm > 2) {
+        if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
-            bool res = check_frame_invariant(depth());
-            if(!res && opts_.algorithm == 3)
-                lavish_frame_repair(depth());
-            else if(! res && opts_.algorithm == 4)
-                sensible_frame_repair(depth());
+            if(!check_frame_invariant(depth()))
+                frame_repair(depth());
         }
+
         while (get_bad(bad)) {
 
             if (!rec_block(bad)) {
                 logger(1) << "found counterexample at depth " << depth()
                           << endlog;
                 model_count_ += 1;
+                print_frames();
                 return false;
             }
         }
@@ -262,7 +234,12 @@ bool FamilyIC3::initial_invariant_check()
         // check if last invariant is inductive in the current model
         if (!initiation_check(last_invariant_) &&
                 !consecution_check(last_invariant_)) {
-            invariant_ = last_invariant_;
+            invariant_.clear();
+            for(Cube c : last_invariant_) {
+                invariant_.push_back(c);
+                for (msat_term &l : invariant_.back())
+                    l = msat_make_not(ts_->get_env(), l);
+            }
             return true;
         }
     }
@@ -311,7 +288,6 @@ bool FamilyIC3::check_init()
 
 bool FamilyIC3::get_bad(Cube &out)
 {
-	std::cout << "depth: " << depth() << std::endl;
     activate_frame(depth());
     activate_bad();
 
@@ -611,8 +587,11 @@ void FamilyIC3::push(Cube &c, unsigned int &idx)
 
 bool FamilyIC3::check_frame_invariant(unsigned int idx)
 {
-    if (idx > 0) {
+    if (idx > 0 && idx < old_frames_.size()-1) {
 
+        std::cout << "index: " << idx << std::endl;
+
+        print_frames();
         // activate trans
         activate_trans_bad(true, false);
 
@@ -622,26 +601,73 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx)
         // create temporary assertion
         solver_.push();
 
-        for(unsigned int i = idx ; i < frames_.size() ;) {
+        std::list<Cube *> frame;
+        get_frame(idx, frame);
 
+        for(std::list<Cube *>::iterator it = frame.begin();
+            it != frame.end(); ++it) {
+            Cube * c = *it;
+
+            // get next state version of cube
+            Cube cp = get_next(*c);
+
+            logger(2) << endlog;
+            logcube(2,cp);
+            logger(2) << endlog;
+
+            // add cube to solver
+            solver_.add_cube_as_cube(cp);
         }
 
+        bool res = solver_.check();
+
         solver_.pop();
+
+        if(res) {
+            // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
+            exit(-3);
+            return false;
+        }
+        else {
+            // add F[idx] from old frames to new frames
+            std::cout << "---------------------------------\n";
+//            logger(2) << "Yes!";
+//            logcube(2, *(*it));
+//            logger(2) << endlog;
+//
+//
+//            // make change to cube
+//            c->push_back(msat_term(make_label("xr")));
+//            logger(2) << "Modified!";
+//            logcube(2, *(*it));
+//            logger(2) << endlog;
+//
+//            c->clear();
+//            logger(2) << "Removed!";
+//            logcube(2, *(*it));
+//            logger(2) << endlog;
+//                }
+            return true;
+        }
+
+
     }
     return false;
 }
 
 void FamilyIC3::lavish_frame_repair(unsigned int idx)
 {
-
+    logger(2) << "Attempting Lavish Frame Repair at idx: " << idx
+              << endlog;
     if(idx > 0) {
         // find clauses responsible
-
     }
 }
 
 void FamilyIC3::sensible_frame_repair(unsigned int idx)
 {
+    logger(2) << "Attempting Sensible Frame Repair at idx: " << idx
+              << endlog;
     if(idx > 0) {
 
     }
@@ -904,8 +930,7 @@ void FamilyIC3::hard_reset()
     minimal_subclause_.clear();
     tmp_.clear();
     gen_needed_.clear();
-    last_reset_calls_ = 0;
-    last_checked_ = false;
+    vp_.id_reset();
 
     // reset measured parameters
     last_reset_calls_ = 0;
@@ -945,8 +970,22 @@ void FamilyIC3::soft_reset()
     // reset solver
     solver_.reset();
 
+    last_checked_ = false;
+
+    // store old frames
+    if(frames_.size() > 1) {
+        old_frames_.clear();
+        for(unsigned int i = 0 ; i < frames_.size() ; ++i) {
+            std::list<Cube> lst;
+            for(Cube c : frames_[i]) {
+                lst.push_back(c);
+            }
+            old_frames_.push_back(lst);
+        }
+    }
+
     // reset internal state
-    //frames_.clear();
+    frames_.clear();
     frame_labels_.clear();
     state_vars_.clear();
     lbl2next_.clear();
@@ -956,8 +995,8 @@ void FamilyIC3::soft_reset()
     tmp_.clear();
     gen_needed_.clear();
     last_reset_calls_ = 0;
-    last_checked_ = false;
     frame_number = 0;
+    vp_.id_reset();
 }
 
 
@@ -1229,6 +1268,24 @@ void FamilyIC3::print_frames()
     }
 }
 
+void FamilyIC3::get_frame(unsigned int idx, std::list<Cube *> &frame)
+{
+    Cube * c;
+    for(unsigned int i = idx ; i < old_frames_.size() ; ++i) {
+        for(std::list<Cube>::iterator it = old_frames_[i].begin() ;
+            it != old_frames_[i].end() ; ++it) {
+            c = &*it;
+            frame.push_back(c);
+        }
+
+    }
+
+}
+
+inline void FamilyIC3::frame_repair(unsigned int idx)
+{
+    return opts_.algorithm == 3 ? lavish_frame_repair(idx) : sensible_frame_repair(idx);
+}
 
 
 } // namespace nexus

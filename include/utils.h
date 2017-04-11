@@ -222,6 +222,10 @@ public:
         return fresh_var(name, msat_get_bool_type(env_));
     }
 
+    void id_reset() {
+        id_ = 1;
+    }
+
 private:
     msat_env env_;
     unsigned int id_;

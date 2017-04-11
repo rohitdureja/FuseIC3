@@ -43,7 +43,7 @@
 #include "solver.h"
 #include <queue>
 #include <random>
-
+#include <list>
 
 namespace nexus {
 
@@ -308,7 +308,11 @@ private:
     ///< query contain a frame.
 
     void print_frames();
+    ///< print all cubes in frames to stdout
 
+    void get_frame(unsigned int idx, std::list<Cube *> &frame);
+
+    inline void frame_repair(unsigned int idx);
 
     //------------------------------------------------------------------------
     // internal state
@@ -399,6 +403,7 @@ private:
     unsigned int frame_number = 0;
     ///< maintain current active frame
 
+    std::vector<std::list<Cube>> old_frames_;
 
     //------------------------------------------------------------------------
     // statistics
