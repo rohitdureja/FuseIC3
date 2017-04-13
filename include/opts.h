@@ -50,6 +50,7 @@ struct Options {
     bool stack;
     bool family;
     int algorithm;
+    int seed;
 
     Options()
     {
@@ -59,6 +60,7 @@ struct Options {
         filename = "";
         stack = true;
         algorithm = 0;
+        seed = 1;
     }
 };
 

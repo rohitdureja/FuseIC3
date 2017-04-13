@@ -325,6 +325,7 @@ private:
     const Options &opts_; ///< algorithm options
 
     VarProvider vp_; ///< provider for fresh variables
+    std::minstd_rand rng_; ///< pseudo-random number generator
 
     Solver solver_; ///< the SMT solver
 

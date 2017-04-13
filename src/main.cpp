@@ -204,6 +204,22 @@ Options parse_options(int argc, const char **argv)
                 ok = false;
                 break;
             }
+        } else if (a == "-s") {
+            ret.family = true;
+            if (i+1 < argc) {
+                std::istringstream buf(argv[i+1]);
+                int val;
+                if (buf >> val) {
+                    ret.seed = val;
+                } else {
+                    ok = false;
+                    break;
+                }
+                ++i;
+            } else {
+                ok = false;
+                break;
+            }
         } else if (a == "-p") {
             ret.stack = false;
         } else if (a == "-h" || a == "-help" || a == "--help") {
@@ -217,6 +233,7 @@ Options parse_options(int argc, const char **argv)
 					  << "\n\n Miscellaneous"
                       << "\n   -v level     set verbosity level (default: 0)"
                       << "\n   -w           print witness (default: false)"
+                      << "\n   -s seed      seed value for random number generator"
 					  << "\n   -h, --help   display this message\n"
 					  << "\n\n Available family checking algorithms"
 					  << "\n (supplied as argument with -f options)"

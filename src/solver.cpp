@@ -124,7 +124,7 @@ void Solver::add_cube_as_cube(const TermList &cube)
     for (msat_term lit : cube) {
         c = msat_make_and(env_, c, lit);
     }
-    logger(2) << logterm(env_,c) << endlog;
+
     msat_assert_formula(env_, c);
 
 }
@@ -139,7 +139,7 @@ void Solver::add_disjunct_cubes(const std::vector<TermList> &cubes)
         }
         expr = msat_make_or(env_, expr, c);
     }
-    std::cout << logterm(env_, expr) << std::endl;
+
     msat_assert_formula(env_, expr);
 }
 
@@ -147,7 +147,6 @@ void Solver::add_disjunct_cubes(const std::vector<TermList> &cubes)
 void Solver::add_binary_clause(const msat_term x, const msat_term y)
 {
     msat_assert_formula(env_, msat_make_or(env_, x, y));
-    logger(2) <<  "dsf" << logterm(env_, msat_make_or(env_, x, y));
 }
 
 void Solver::assume(msat_term a)

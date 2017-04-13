@@ -42,6 +42,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <fstream>
+#include <set>
 
 
 namespace nexus {
@@ -50,6 +51,7 @@ FamilyIC3::FamilyIC3(const msat_env &env, const Options &opts):
     ts_(nullptr),
     opts_(opts),
     vp_(env),
+    rng_(opts.seed),
     solver_(env, opts)
 {
     // generate labels
@@ -96,6 +98,8 @@ bool FamilyIC3::prove()
         if(opts_.algorithm == 1) {
             std::vector<Cube> min;
             if(invariant_finder(min)) {
+                logger(2) << "Found minimal inductive subclause"
+                          << endlog;
                 // add the minimal invariant to the solver
                 // it is always enabled when any frame is part of the SAT query
                 add_minimal_inductive_subclause(min);
@@ -623,13 +627,12 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
 
         solver_.add_disjunct_cubes(pcubes);
 
-        bool sat = solver_.check();
+        bool sat = solve();
 
         solver_.pop();
 
         if(sat) {
             // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
-//            exit(-3);
             cubes.clear();
             std::swap(cubes, frame);
             return false;
@@ -646,25 +649,6 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
                 }
             }
             print_frames();
-//            std::cout << frames_[idx].size() << std::endl;
-//            logcube(2, frames_[idx][0]);
-//            logger(2) << endlog;
-
-//            logger(2) << "Yes!";
-//            logcube(2, *(*it));
-//            logger(2) << endlog;
-//
-//
-//            // make change to cube
-//            c->push_back(msat_term(make_label("xr")));
-//            logger(2) << "Modified!";
-//            logcube(2, *(*it));
-//            logger(2) << endlog;
-//
-//            c->clear();
-//            logger(2) << "Removed!";
-//            logcube(2, *(*it));
-//            logger(2) << endlog;
             cubes.clear();
             std::swap(cubes, frame);
             return true;
@@ -699,18 +683,98 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
 {
     logger(2) << "Attempting Sensible Frame Repair at idx: " << idx
               << endlog;
+
+    typedef std::uniform_int_distribution<int> RandInt;
+    RandInt dis;
+
     if(idx > 0) {
         // find clauses responsible
         std::list<Cube *> cubes;
         find_cubes_at_fault(idx, frame, cubes);
 
         // we start repairing each cube in the list of cubes
-        // in sensible frame repair, these cubes are simply dropped.
+        // in sensible frame repair, these cubes are repaired by adding
+        // missing literals.
+
 
         for(std::list<Cube *>::iterator it = cubes.begin();
             it != cubes.end(); ++it) {
             Cube * c = *it;
-            c->clear();
+
+            // find literals in current cube
+            std::set<msat_term> current;
+            for(msat_term l : *c) {
+                if(msat_term_is_not(ts_->get_env(), l))
+                    current.insert(lit(l, true));
+                else
+                    current.insert(l);
+            }
+
+            // find literal not in cube
+            std::vector<msat_term> rest;
+            std::set_difference(ts_->statevars().begin(), ts_->statevars().end(),
+                                current.begin(), current.end(),
+                                std::inserter(rest, rest.begin()));
+
+
+            // activate trans
+            activate_trans_bad(true, false);
+
+            // activate frame
+            activate_frame(idx - 1);
+
+            // create temporary assertion
+            solver_.push();
+
+            // add next state version of cube to solver
+            Cube cp = get_next(*c);
+            solver_.add_cube_as_cube(cp);
+
+            bool sat = solve();
+
+
+            while(sat && !rest.empty()) {
+                // get model assignment for a literal not in the cube
+                // generate random number
+                size_t j = (dis(rng_,
+                            RandInt::param_type(1, ts_->statevars().size())) - 1);
+                bool val = solver_.model_value(ts_->next(rest[j]));
+
+                // update cube c;
+                c->push_back(lit(rest[j], val ? true : false));
+
+                // remove added literal from rest
+                rest.erase(rest.begin() + j);
+
+                solver_.pop();
+
+                // activate trans
+                activate_trans_bad(true, false);
+
+                // activate frame
+                activate_frame(idx - 1);
+
+                // create temporary assertion
+                solver_.push();
+
+                // add next state version of cube to solver
+                Cube cp = get_next(*c);
+                solver_.add_cube_as_cube(cp);
+
+                sat = solve();
+
+            }
+
+            if(sat) // means there is only one state missing from the cube
+                c->clear();
+            else {
+                std::cout << "phase 2" << std::endl;
+                exit(-3);
+                // generalization appears here
+            }
+//            std::cout << "here\n";
+//            exit(-3);
+
         }
 
         return;
@@ -1259,11 +1323,13 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
         solver_.push();
         solver_.add(t);
 
+        activate_trans_bad(true, false);
+
         bool sat = solve();
 
         if(!sat) {
             // found minimal subclause
-            cubes = temp;
+            std::swap(temp, cubes);
             solver_.pop();
             solver_.pop();
             return true;
@@ -1298,9 +1364,14 @@ void FamilyIC3::add_minimal_inductive_subclause(std::vector<Cube> &cubes)
 
     // add to solver
     for(Cube c: minimal_subclause_) {
-        logcube(2, c) << endlog;
+        logger(2) << "Adding: ";
+        logcube(2, c);
+        logger(2) << " to known invariant clauses" << endlog;
+
+        //TODO: add the minimal inductive subclause
         solver_.add_cube_as_clause(c, minimal_subclause_label_);
     }
+    exit(-3);
 }
 
 void FamilyIC3::print_frames()
@@ -1376,9 +1447,7 @@ void FamilyIC3::find_cubes_at_fault(unsigned int idx, std::list<Cube *> &frame,
         solver_.push();
         solver_.add(expr);
 
-        logger(2) << logterm(ts_->get_env(), expr) << endlog;
-
-        bool sat = solver_.check();
+        bool sat = solve();
 
         if(!sat) {
             solver_.pop();
