@@ -76,6 +76,9 @@ public:
     void add_disjunct_cubes(const std::vector<TermList> &cubes);
     ///< add disjunction of all cubes in the SMT solver
 
+    void add_binary_clause(msat_term x, msat_term y);
+    ///< add the binary clause x | y to the solver
+
     void push();
     ///< push a backtracking point in the SMT solver
     
@@ -101,6 +104,7 @@ public:
     void reset();
     ///< reset the SMT context completely (removing all the asserted formulas
     ///< and reinitializing the internal solver state)
+
 
 private:
     Solver(const Solver &other);

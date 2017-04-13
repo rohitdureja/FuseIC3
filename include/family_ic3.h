@@ -199,14 +199,14 @@ private:
     void push(Cube &c, unsigned int &idx);
     ///< find the highest index idx for which (~c & F[idx] & T |= ~c')
 
-    bool check_frame_invariant(unsigned int idx);
+    bool check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes);
     ///< check whether the frames invariant F[i-1] & T |= F[i] holds
 
-    void lavish_frame_repair(unsigned int idx);
+    void lavish_frame_repair(unsigned int idx, std::list<Cube *> &cubes);
     ///< clauses in F[idx] that violate F[idx-1] & T |= F[idx]' are replaced
     ///< with True which makes the formula UNSAT
 
-    void sensible_frame_repair(unsigned int idx);
+    void sensible_frame_repair(unsigned int idx, std::list<Cube *> &cubes);
     ///< clauses in F[idx] that violate F[idx-1] & T |= F[idx]' are replaced
     ///< generalized clauses which makes the formula UNSAT
 
@@ -312,7 +312,10 @@ private:
 
     void get_frame(unsigned int idx, std::list<Cube *> &frame);
 
-    inline void frame_repair(unsigned int idx);
+    inline void frame_repair(unsigned int idx, std::list<Cube *> &frame);
+
+    void find_cubes_at_fault(unsigned int idx, std::list<Cube *> &frame,
+                             std::list<Cube *> &cubes);
 
     //------------------------------------------------------------------------
     // internal state

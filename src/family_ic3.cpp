@@ -116,8 +116,9 @@ bool FamilyIC3::prove()
         // in family algorithm 3 and 4, frame repair is performed.
         if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
-            if(!check_frame_invariant(depth()))
-                frame_repair(depth());
+            std::list<Cube *> frame;
+            if(!check_frame_invariant(depth(), frame))
+                frame_repair(depth(), frame);
         }
 
         while (get_bad(bad)) {
@@ -396,6 +397,7 @@ bool FamilyIC3::propagate()
         Frame &f = frames_[k];
         // forward propagation: try to see if f[k] is inductive relative to
         // F[k+1]
+        bool iempty = frames_[k].empty();
         for (size_t i = 0; i < f.size(); ++i) {
             to_add.push_back(Cube());
 
@@ -414,7 +416,7 @@ bool FamilyIC3::propagate()
         for (Cube &c : to_add) {
             add_blocked(c, k+1);
         }
-        if (frames_[k].empty()) {
+        if (frames_[k].empty() != iempty) {
             // fixpoint: frames_[k] == frames_[k+1]
             break;
         }
@@ -585,7 +587,7 @@ void FamilyIC3::push(Cube &c, unsigned int &idx)
 }
 
 
-bool FamilyIC3::check_frame_invariant(unsigned int idx)
+bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes)
 {
     if (idx > 0 && idx < old_frames_.size()-1) {
 
@@ -625,12 +627,25 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx)
 
         if(res) {
             // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
-            exit(-3);
+//            exit(-3);
+            cubes.clear();
+            std::swap(cubes, frame);
             return false;
         }
         else {
             // add F[idx] from old frames to new frames
             std::cout << "---------------------------------\n";
+            for(std::list<Cube *>::iterator it = frame.begin();
+                it != frame.end(); ++it) {
+                Cube * c = *it;
+                if(block(*c, idx, nullptr, false))
+                    add_blocked(*c, idx);
+            }
+            print_frames();
+//            std::cout << frames_[idx].size() << std::endl;
+//            logcube(2, frames_[idx][0]);
+//            logger(2) << endlog;
+
 //            logger(2) << "Yes!";
 //            logcube(2, *(*it));
 //            logger(2) << endlog;
@@ -646,25 +661,29 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx)
 //            logger(2) << "Removed!";
 //            logcube(2, *(*it));
 //            logger(2) << endlog;
-//                }
+            cubes.clear();
+            std::swap(cubes, frame);
             return true;
         }
-
-
     }
-    return false;
+    return true;
 }
 
-void FamilyIC3::lavish_frame_repair(unsigned int idx)
+void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {
     logger(2) << "Attempting Lavish Frame Repair at idx: " << idx
               << endlog;
     if(idx > 0) {
         // find clauses responsible
+        std::list<Cube *> cubes;
+        find_cubes_at_fault(idx, frame, cubes);
+        std::cout << frame.size() << std::endl;
+        std::cout << cubes.size() << std::endl;
+        exit(-3);
     }
 }
 
-void FamilyIC3::sensible_frame_repair(unsigned int idx)
+void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &cubes)
 {
     logger(2) << "Attempting Sensible Frame Repair at idx: " << idx
               << endlog;
@@ -846,6 +865,11 @@ void FamilyIC3::ensure_not_initial(Cube &c, Cube &rest)
 {
     // we know that "init & c & rest" is unsat. If "init & c" is sat, we find
     // a small subset of "rest" to add-back to c to restore unsatisfiability
+    logcube(2,c);
+    logger(2) << endlog;
+
+    logcube(2,rest);
+    logger(2) << endlog;
     if (is_initial(c)) {
         size_t n = c.size();
         c.insert(c.end(), rest.begin(), rest.end());
@@ -1185,7 +1209,7 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
         // for each literal a in the clause c', add clause (y | !a)
         // to the solver. equivalent to (c' => y)
         for(msat_term literal : cprimed) {
-            solver_.add(y_label, literal);
+            solver_.add_binary_clause(y_label, literal);
         }
 
         x_labels.push_back(x_label);
@@ -1277,14 +1301,83 @@ void FamilyIC3::get_frame(unsigned int idx, std::list<Cube *> &frame)
             c = &*it;
             frame.push_back(c);
         }
-
     }
-
 }
 
-inline void FamilyIC3::frame_repair(unsigned int idx)
+inline void FamilyIC3::frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {
-    return opts_.algorithm == 3 ? lavish_frame_repair(idx) : sensible_frame_repair(idx);
+    return opts_.algorithm == 3 ? lavish_frame_repair(idx, frame)
+                                : sensible_frame_repair(idx, frame);
+}
+
+void FamilyIC3::find_cubes_at_fault(unsigned int idx, std::list<Cube *> &frame,
+                             std::list<Cube *> &cubes)
+{
+
+    // activate trans
+    activate_trans_bad(true, false);
+
+    // activate F[idx - 1]
+    activate_frame(idx - 1);
+
+    std::vector<msat_term> y_labels;
+    std::unordered_map<msat_term, Cube *> cmap;
+
+    solver_.push();
+    // introduce a new aux variable y for each clause
+    // add (y | !a) for each literal in the clause
+    for(std::list<Cube *>::iterator it = frame.begin();
+        it != frame.end();
+        ++it) {
+        Cube cp = get_next(*(*it));
+        msat_term yl = make_label("y");
+
+        for(msat_term lit : cp) {
+            solver_.add_binary_clause(yl, lit);
+        }
+
+        y_labels.push_back(yl);
+        cmap.insert(std::pair<msat_term, Cube *>(yl, *it));
+    }
+
+    while(cmap.size() > 0) {
+
+        msat_term expr = msat_make_false(ts_->get_env());
+        for(msat_term lbl : y_labels)
+            expr = msat_make_or(ts_->get_env(),
+                                expr,
+                                msat_make_not(ts_->get_env(), lbl));
+        solver_.push();
+        solver_.add(expr);
+
+        logger(2) << logterm(ts_->get_env(), expr) << endlog;
+
+        bool sat = solver_.check();
+
+        if(!sat) {
+            solver_.pop();
+            break;
+        }
+        else {
+            // extract values of y
+            for(unsigned int i = 0 ; i < y_labels.size() ;) {
+                bool val = solver_.model_value(y_labels[i]);
+                if(!val) { // clause needs repair
+
+                    // remove from further consideration
+                    cubes.push_back(cmap[y_labels[i]]);
+                    cmap.erase(y_labels[i]);
+
+                    y_labels.erase(y_labels.begin() + i);
+                }
+                else
+                    ++i;
+            }
+            solver_.pop();
+        }
+    }
+    solver_.pop();
+    return;
 }
 
 
