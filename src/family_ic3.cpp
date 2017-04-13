@@ -117,7 +117,7 @@ bool FamilyIC3::prove()
         if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
             std::list<Cube *> frame;
-            if(!check_frame_invariant(depth(), frame))
+            while(!check_frame_invariant(depth(), frame))
                 frame_repair(depth(), frame);
         }
 
@@ -606,26 +606,28 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
         std::list<Cube *> frame;
         get_frame(idx, frame);
 
+        std::vector<Cube> pcubes;
         for(std::list<Cube *>::iterator it = frame.begin();
             it != frame.end(); ++it) {
             Cube * c = *it;
 
             // get next state version of cube
-            Cube cp = get_next(*c);
-
-            logger(2) << endlog;
-            logcube(2,cp);
-            logger(2) << endlog;
-
-            // add cube to solver
-            solver_.add_cube_as_cube(cp);
+            if(!c->empty()) {
+                Cube cp = get_next(*c);
+                pcubes.push_back(cp);
+                logger(2) << endlog;
+                logcube(2,cp);
+                logger(2) << endlog;
+            }
         }
 
-        bool res = solver_.check();
+        solver_.add_disjunct_cubes(pcubes);
+
+        bool sat = solver_.check();
 
         solver_.pop();
 
-        if(res) {
+        if(sat) {
             // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
 //            exit(-3);
             cubes.clear();
@@ -638,8 +640,10 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
             for(std::list<Cube *>::iterator it = frame.begin();
                 it != frame.end(); ++it) {
                 Cube * c = *it;
-                if(block(*c, idx, nullptr, false))
-                    add_blocked(*c, idx);
+                if(!c->empty()) {
+                    if(block(*c, idx, nullptr, false))
+                        add_blocked(*c, idx);
+                }
             }
             print_frames();
 //            std::cout << frames_[idx].size() << std::endl;
@@ -677,17 +681,39 @@ void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
         // find clauses responsible
         std::list<Cube *> cubes;
         find_cubes_at_fault(idx, frame, cubes);
-        std::cout << frame.size() << std::endl;
-        std::cout << cubes.size() << std::endl;
-        exit(-3);
+
+        // we start repairing each cube in the list of cubes
+        // in lavish frame repair, these cubes are simply dropped.
+
+        for(std::list<Cube *>::iterator it = cubes.begin();
+            it != cubes.end(); ++it) {
+            Cube * c = *it;
+            c->clear();
+        }
+
+        return;
     }
 }
 
-void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &cubes)
+void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {
     logger(2) << "Attempting Sensible Frame Repair at idx: " << idx
               << endlog;
     if(idx > 0) {
+        // find clauses responsible
+        std::list<Cube *> cubes;
+        find_cubes_at_fault(idx, frame, cubes);
+
+        // we start repairing each cube in the list of cubes
+        // in sensible frame repair, these cubes are simply dropped.
+
+        for(std::list<Cube *>::iterator it = cubes.begin();
+            it != cubes.end(); ++it) {
+            Cube * c = *it;
+            c->clear();
+        }
+
+        return;
 
     }
 }
