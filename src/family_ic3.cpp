@@ -994,7 +994,7 @@ FamilyIC3::Cube FamilyIC3::get_next(const Cube &c)
 
     for (msat_term l : c) {
         auto it = lbl2next_.find(var(l));
-        //assert(it != lbl2next_.end());
+        assert(it != lbl2next_.end());
         ret.push_back(lit(it->second, l != it->first));
     }
     return ret;
