@@ -96,13 +96,10 @@ bool FamilyIC3::prove()
         // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
         //   Formal Verification of Hardware. FMCAD 2011
         if(opts_.algorithm == 1) {
-            std::vector<Cube> min;
-            if(invariant_finder(min)) {
+
+            if(invariant_finder(min_clause_)) {
                 logger(2) << "Found minimal inductive subclause"
                           << endlog;
-                // add the minimal invariant to the solver
-                // it is always enabled when any frame is part of the SAT query
-                add_minimal_inductive_subclause(min);
             }
         }
     }
@@ -121,8 +118,13 @@ bool FamilyIC3::prove()
         if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
             std::list<Cube *> frame;
-            while(!check_frame_invariant(depth(), frame))
+            if(!check_frame_invariant(depth(), frame))
                 frame_repair(depth(), frame);
+        }
+        if (propagate()) {
+            model_count_ += 1;
+            print_frames();
+            return true;
         }
 
         while (get_bad(bad)) {
@@ -136,11 +138,11 @@ bool FamilyIC3::prove()
             }
         }
         new_frame();
-        if (propagate()) {
-            model_count_ += 1;
-            print_frames();
-            return true;
-        }
+//        if (propagate()) {
+//            model_count_ += 1;
+//            print_frames();
+//            return true;
+//        }
     }
 }
 
@@ -255,6 +257,8 @@ bool FamilyIC3::initial_invariant_check()
 bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
 {
     if(model_count_ > 0 && !last_invariant_.empty()) {
+
+        min_clause_.clear();
 
         // copy last known invariant to temp
         inv = last_invariant_;
@@ -644,8 +648,11 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
                 it != frame.end(); ++it) {
                 Cube * c = *it;
                 if(!c->empty()) {
-                    if(block(*c, idx, nullptr, false))
+                   // if(block(*c, idx, nullptr, false))
                         add_blocked(*c, idx);
+                  //  else
+                //        c->clear();
+
                 }
             }
             print_frames();
@@ -717,6 +724,7 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
                                 std::inserter(rest, rest.begin()));
 
 
+
             // activate trans
             activate_trans_bad(true, false);
 
@@ -733,11 +741,13 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
             bool sat = solve();
 
 
+            std::cout << logterm (ts_->get_env(), rest[0]) << std::endl;
             while(sat && !rest.empty()) {
                 // get model assignment for a literal not in the cube
                 // generate random number
                 size_t j = (dis(rng_,
-                            RandInt::param_type(1, ts_->statevars().size())) - 1);
+                            RandInt::param_type(1, rest.size())) - 1);
+                std::cout << j << std::endl;
                 bool val = solver_.model_value(ts_->next(rest[j]));
 
                 // update cube c;
@@ -764,16 +774,20 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
                 sat = solve();
 
             }
-
-            if(sat) // means there is only one state missing from the cube
+            solver_.pop();
+            if(sat || rest.empty()) // means there is only one state
+                                    // missing from the cube
                 c->clear();
-            else {
+            else if(!sat) {
                 std::cout << "phase 2" << std::endl;
-                exit(-3);
-                // generalization appears here
+                // TODO: generalization appears here
+                if(!c->empty()) {
+                   // if(block(*c, idx, nullptr, false))
+                        add_blocked(*c, idx);
+                   // else
+                    //    c->clear();
+                }
             }
-//            std::cout << "here\n";
-//            exit(-3);
 
         }
 
@@ -833,6 +847,14 @@ void FamilyIC3::new_frame()
         frames_.push_back(Frame());
 
     frame_labels_.push_back(make_label("frame"));
+
+    if(depth() == 1 && opts_.algorithm == 1 && !min_clause_.empty()){
+        for(Cube c : min_clause_) {
+            frames_[depth()].push_back(c);
+            add_blocked(c, depth());
+        }
+
+    }
 }
 
 
@@ -871,7 +893,7 @@ void FamilyIC3::add_blocked(Cube &c, unsigned int idx)
 
     logger(2) << "adding cube of size " << c.size() << " at level " << idx
               << ": ";
-    logcube(3, c);
+    logcube(2, c);
     logger(2) << endlog;
 
     ++num_added_cubes_;
@@ -1111,6 +1133,8 @@ void FamilyIC3::soft_reset()
     last_reset_calls_ = 0;
     frame_number = 0;
     vp_.id_reset();
+
+
 }
 
 
@@ -1352,26 +1376,6 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
     }
     solver_.pop();
     return false;
-}
-
-void FamilyIC3::add_minimal_inductive_subclause(std::vector<Cube> &cubes)
-{
-    minimal_subclause_.clear();
-    std::swap(cubes, minimal_subclause_);
-
-    // create a label for the clause
-    minimal_subclause_label_ = make_label("ind_sub");
-
-    // add to solver
-    for(Cube c: minimal_subclause_) {
-        logger(2) << "Adding: ";
-        logcube(2, c);
-        logger(2) << " to known invariant clauses" << endlog;
-
-        //TODO: add the minimal inductive subclause
-        solver_.add_cube_as_clause(c, minimal_subclause_label_);
-    }
-    exit(-3);
 }
 
 void FamilyIC3::print_frames()

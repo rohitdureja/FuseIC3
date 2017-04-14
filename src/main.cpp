@@ -211,6 +211,7 @@ Options parse_options(int argc, const char **argv)
                 int val;
                 if (buf >> val) {
                     ret.seed = val;
+                    std::cout << val << std::endl;
                 } else {
                     ok = false;
                     break;
@@ -380,7 +381,7 @@ int main(int argc, const char **argv)
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
 
-        getchar();
+//        getchar();
 
     }
 
