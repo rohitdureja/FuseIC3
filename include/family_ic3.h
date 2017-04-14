@@ -162,6 +162,11 @@ private:
     bool initial_invariant_check();
     ///< check whether the model satisfies the previously found invariant
 
+    bool simulate_last_cex();
+    ///< simulate the counterexample from the last run to check if it is
+    ///< valid in the current model being checked. if valid, the property
+    ///< is false for the model. Otherwise, proceed.
+
     bool invariant_finder(std::vector<TermList> &invariant);
     ///< find the minimal subclause in the last found invariants that is
     ///< inductive with respect to the current model being checked
@@ -306,7 +311,12 @@ private:
     void print_frames();
     ///< print all cubes in frames to stdout
 
-    void get_frame(unsigned int idx, std::list<Cube *> &frame);
+    void get_old_frame(unsigned int idx, std::list<Cube *> &frame);
+    ///< returns the cubes in frame at idx from the set of frames
+    ///< for the last model checked
+
+    void get_old_frame(std::vector<Cube> &frame);
+    ///< returns all cubes in the frames for the last model checked
 
     inline void frame_repair(unsigned int idx, std::list<Cube *> &frame);
 

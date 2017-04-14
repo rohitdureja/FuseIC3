@@ -96,7 +96,12 @@ bool FamilyIC3::prove()
         // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
         //   Formal Verification of Hardware. FMCAD 2011
         if(opts_.algorithm == 1) {
-
+            if(simulate_last_cex()) {
+                // last cex holds in the model being checked
+                last_checked_ = false;
+                cex_ = last_cex_;
+                return false;
+            }
             if(invariant_finder(min_clause_)) {
                 logger(2) << "Found minimal inductive subclause"
                           << endlog;
@@ -120,11 +125,12 @@ bool FamilyIC3::prove()
             std::list<Cube *> frame;
             if(!check_frame_invariant(depth(), frame))
                 frame_repair(depth(), frame);
-        }
-        if (propagate()) {
-            model_count_ += 1;
-            print_frames();
-            return true;
+
+            if (propagate()) {
+                model_count_ += 1;
+                print_frames();
+                return true;
+            }
         }
 
         while (get_bad(bad)) {
@@ -138,11 +144,14 @@ bool FamilyIC3::prove()
             }
         }
         new_frame();
-//        if (propagate()) {
-//            model_count_ += 1;
-//            print_frames();
-//            return true;
-//        }
+        if(opts_.algorithm <=2 || model_count_ < 1) {
+            if (propagate()) {
+                model_count_ += 1;
+                print_frames();
+                return true;
+            }
+        }
+
     }
 }
 
@@ -253,10 +262,85 @@ bool FamilyIC3::initial_invariant_check()
     return false;
 }
 
+bool FamilyIC3::simulate_last_cex()
+{
+    if(model_count_ > 0 && !last_cex_.empty()) {
+
+        // first check if first state in the cex intersects
+        // with one of the initial states
+
+        // activate init
+        activate_frame(0);
+
+        // create temporary assertion
+        solver_.push();
+
+        // add first state of cex
+        solver_.add_cube_as_cube(last_cex_[0]);
+
+        bool sat = solve();
+
+        solver_.pop();
+
+        // if sat, the initial state is valid, and we proceed with
+        // checking the rest of the cex. otherwise, the cex is invalid.
+        if(sat)
+        {
+            // try simulating cex
+            for(unsigned int i = 0 ; i < last_cex_.size() - 1 ; ++i)
+            {
+                //activate_trans
+                activate_trans_bad(true, false);
+
+                // create temporary assertion
+                solver_.push();
+
+                // add ith state from cex
+                solver_.add_cube_as_cube(last_cex_[i]);
+
+                // add (i+1)th state from cex (next state)
+                solver_.add_cube_as_cube(get_next(last_cex_[i+1]));
+
+                sat = solve();
+
+                solver_.pop();
+
+                // if unsat, cex is invalid
+                if(!sat)
+                    return false;
+            }
+            return true; // cex valid
+        }
+        return false;
+    }
+    return false;
+}
+
 // method to find minimal inductive subclause from last known invariant
 bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
 {
-    if(model_count_ > 0 && !last_invariant_.empty()) {
+    if(model_count_ > 0 && !last_cex_.empty()) {
+        // find the minimal inductive subclause from the set of
+        // frames computed for the last model.
+
+        min_clause_.clear();
+
+        // copy old frames
+        inv.clear();
+        get_old_frame(inv);
+
+        // at this point temp is a vector of cubes. since we are interested
+        // in clauses, we use negation in all operations
+
+        // remove clauses not in init.
+        remove_clauses_violating_init(inv);
+
+        // find minimal inductive subclause
+        if(find_minimal_inductive_subclause(inv))
+            return true;
+
+    }
+    else if(model_count_ > 0 && !last_invariant_.empty()) {
 
         min_clause_.clear();
 
@@ -448,6 +532,7 @@ bool FamilyIC3::propagate()
                 }
             }
         }
+        last_cex_.clear();
         return true;
     }
 
@@ -612,7 +697,7 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
         solver_.push();
 
         std::list<Cube *> frame;
-        get_frame(idx, frame);
+        get_old_frame(idx, frame);
 
         std::vector<Cube> pcubes;
         for(std::list<Cube *>::iterator it = frame.begin();
@@ -909,7 +994,7 @@ FamilyIC3::Cube FamilyIC3::get_next(const Cube &c)
 
     for (msat_term l : c) {
         auto it = lbl2next_.find(var(l));
-        assert(it != lbl2next_.end());
+        //assert(it != lbl2next_.end());
         ret.push_back(lit(it->second, l != it->first));
     }
     return ret;
@@ -1393,7 +1478,7 @@ void FamilyIC3::print_frames()
     }
 }
 
-void FamilyIC3::get_frame(unsigned int idx, std::list<Cube *> &frame)
+void FamilyIC3::get_old_frame(unsigned int idx, std::list<Cube *> &frame)
 {
     Cube * c;
     for(unsigned int i = idx ; i < old_frames_.size() ; ++i) {
@@ -1404,6 +1489,19 @@ void FamilyIC3::get_frame(unsigned int idx, std::list<Cube *> &frame)
         }
     }
 }
+
+void FamilyIC3::get_old_frame(std::vector<Cube> &frame)
+{
+    frame.clear();
+    Cube * c;
+    for(std::list<Cube>::iterator it = old_frames_[0].begin() ;
+        it != old_frames_[0].end() ; ++it) {
+        c = &*it;
+        frame.push_back(*c);
+    }
+
+}
+
 
 inline void FamilyIC3::frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {

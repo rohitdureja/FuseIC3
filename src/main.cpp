@@ -381,7 +381,7 @@ int main(int argc, const char **argv)
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
 
-//        getchar();
+        getchar();
 
     }
 
