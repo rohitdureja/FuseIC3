@@ -83,7 +83,7 @@ bool FamilyIC3::prove()
 
     remove_unused_vars();
 
-    std::cout << "here\n";
+//    std::cout << "here\n";
 
     // to maintain time, defined in utils.h
     TimeKeeper t(total_time_);
@@ -93,12 +93,9 @@ bool FamilyIC3::prove()
         if(initial_invariant_check()) {
             last_checked_ = true;
             model_count_++;
-            old_frames_.clear();
+            //old_frames_.clear();
             return true;
         }
-
-
-
 
         if(simulate_last_cex()) {
             // last cex holds in the model being checked
@@ -126,7 +123,6 @@ bool FamilyIC3::prove()
     if (!check_init()) {
         last_checked_ = false;
         model_count_++;
-        old_frames_.clear();
         return false;
     }
 
@@ -146,7 +142,7 @@ bool FamilyIC3::prove()
             if (propagate()) {
                 model_count_ += 1;
                 print_frames();
-                old_frames_.clear();
+                //old_frames_.clear();
                 return true;
             }
         }
@@ -167,7 +163,7 @@ bool FamilyIC3::prove()
             if (propagate()) {
                 model_count_ += 1;
                 print_frames();
-                old_frames_.clear();
+               // old_frames_.clear();
                 return true;
             }
         }
@@ -706,7 +702,7 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
 {
     if (idx > 0 && idx < old_frames_.size()-1) {
 
-        std::cout << "index: " << idx << std::endl;
+//        std::cout << "index: " << idx << std::endl;
 
         print_frames();
         // activate trans
@@ -722,56 +718,53 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
 
         get_old_frame(idx, frame);
 
-//        if(!frame.empty()) {
-            std::vector<Cube> pcubes;
+        std::vector<Cube> pcubes;
+        for(std::list<Cube *>::iterator it = frame.begin();
+            it != frame.end(); ++it) {
+            Cube * c = *it;
+
+            // get next state version of cube
+            if(!c->empty()) {
+                Cube cp = get_next(*c);
+                pcubes.push_back(cp);
+                logger(2) << endlog;
+                logcube(2,cp);
+                logger(2) << endlog;
+            }
+        }
+
+        solver_.add_disjunct_cubes(pcubes);
+
+        bool sat = solve();
+
+        solver_.pop();
+
+        if(sat) {
+            // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
+            cubes.clear();
+            std::swap(cubes, frame);
+            return false;
+        }
+        else {
+            // add F[idx] from old frames to new frames
+//            std::cout << "---------------------------------\n";
             for(std::list<Cube *>::iterator it = frame.begin();
                 it != frame.end(); ++it) {
                 Cube * c = *it;
 
-                // get next state version of cube
                 if(!c->empty()) {
-                    Cube cp = get_next(*c);
-                    pcubes.push_back(cp);
-                    logger(2) << endlog;
-                    logcube(2,cp);
-                    logger(2) << endlog;
-                }
-            }
-
-            solver_.add_disjunct_cubes(pcubes);
-
-            bool sat = solve();
-
-            solver_.pop();
-
-            if(sat) {
-                // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
-                cubes.clear();
-                std::swap(cubes, frame);
-                return false;
-            }
-            else {
-                // add F[idx] from old frames to new frames
-                std::cout << "---------------------------------\n";
-                std::cout << frame.size() << std::endl;
-                for(std::list<Cube *>::iterator it = frame.begin();
-                    it != frame.end(); ++it) {
-                    Cube * c = *it;
-
-                    if(!c->empty()) {
 //                        if(block(*c, idx, nullptr, false)) {
-                            add_blocked(*c, idx);
-    //                    else
-                            c->clear();
+                        add_blocked(*c, idx);
+//                    else
+                        c->clear();
 //                        }
 
-                    }
                 }
-                print_frames();
-                cubes.clear();
-                return true;
             }
-//        }
+            print_frames();
+            cubes.clear();
+            return true;
+        }
     }
     return true;
 }
@@ -784,7 +777,7 @@ void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
         // find clauses responsible
         std::list<Cube *> cubes;
         find_cubes_at_fault(idx, frame, cubes);
-        std::cout << "Fault cubes: " << cubes.size() << std::endl;
+//        std::cout << "Fault cubes: " << cubes.size() << std::endl;
         // we start repairing each cube in the list of cubes
         // in lavish frame repair, these cubes are simply dropped.
 
@@ -806,14 +799,14 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
 
     typedef std::uniform_int_distribution<int> RandInt;
     RandInt dis;
-    std::cout << "total: " << frame.size() << std::endl;
+//    std::cout << "total: " << frame.size() << std::endl;
 
     if(idx > 0) {
         // find clauses responsible
         std::list<Cube *> cubes;
         find_cubes_at_fault(idx, frame, cubes);
 
-        std::cout << "incorrect: " << cubes.size() << std::endl;
+//        std::cout << "incorrect: " << cubes.size() << std::endl;
 
         // we start repairing each cube in the list of cubes
         // in sensible frame repair, these cubes are repaired by adding
@@ -851,14 +844,14 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
 
             bool sat = solve();
 
-            std::cout << "original cube size: " << c->size() << std::endl;
+//            std::cout << "original cube size: " << c->size() << std::endl;
             while(sat && !rest.empty()) {
                 // get model assignment for a literal not in the cube
                 // generate random number
                 size_t j = (dis(rng_,
                             RandInt::param_type(1, rest.size())) - 1);
 
-                std::cout << j << std::endl;
+//                std::cout << j << std::endl;
                 bool val = solver_.model_value(ts_->next(rest[j]));
 
                 // update cube c;
@@ -881,16 +874,16 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
                 solver_.add_cube_as_cube(get_next(*c));
 
                 sat = solve();
-                std::cout << sat << std::endl;
+//                std::cout << sat << std::endl;
 
             }
-            std::cout << "repaired cube size: " << c->size() << std::endl;
+//            std::cout << "repaired cube size: " << c->size() << std::endl;
             solver_.pop();
             if(sat || rest.empty()) // means there is only one state
                                     // missing from the cube
                 c->clear();
             else if(!sat) {
-                std::cout << "phase 2" << std::endl;
+//                std::cout << "phase 2" << std::endl;
                 exit(-3);
                 // TODO: generalization appears here
 //                if(!c->empty()) {
@@ -1209,10 +1202,10 @@ void FamilyIC3::soft_reset()
     // reset solver
     solver_.reset();
 
-    last_checked_ = false;
+
 
     // store old frames
-    if(frames_.size() > 1) {
+    if(frames_.size() > 1 && last_checked_ == true) {
         old_frames_.clear();
         for(unsigned int i = 0 ; i < frames_.size() ; ++i) {
             std::list<Cube> lst;
@@ -1223,6 +1216,7 @@ void FamilyIC3::soft_reset()
         }
     }
 
+    last_checked_ = false;
     // reset internal state
     frames_.clear();
     frame_labels_.clear();
@@ -1554,7 +1548,7 @@ void FamilyIC3::remove_unused_vars()
             ++j;
     }
 
-    std::cout << "done with old\n";
+//    std::cout << "done with old\n";
     // check if all good
     for(unsigned int j = 0 ; j < old_frames_.size() ;) {
         std::list<Cube> &f = old_frames_[j];
@@ -1591,7 +1585,7 @@ void FamilyIC3::remove_unused_vars()
             }
         }
     }
-    std::cout << "done with cex\n";
+//    std::cout << "done with cex\n";
 
     // remove vars not in current model from invariant
     for(unsigned int i = 0 ; i < last_invariant_.size() ;) {
@@ -1610,7 +1604,7 @@ void FamilyIC3::remove_unused_vars()
         else
             ++i;
     }
-    std::cout << "done with inv\n";
+//    std::cout << "done with inv\n";
 }
 
 inline void FamilyIC3::frame_repair(unsigned int idx, std::list<Cube *> &frame)
