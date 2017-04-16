@@ -332,7 +332,7 @@ int main(int argc, const char **argv)
     // start reading files and running algorithm
     for(std::string file : files) {
 
-        logger(1) << "Checking file: " << file << endlog;
+        std::cout << "\nChecking file: " << file << std::endl;
 
         // set file to current file
         options.filename = file;
@@ -381,7 +381,7 @@ int main(int argc, const char **argv)
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
 
-        getchar();
+//        getchar();
 
     }
 

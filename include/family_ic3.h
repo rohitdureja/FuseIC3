@@ -231,6 +231,7 @@ private:
     void add_blocked(Cube &c, unsigned int idx);
     ///< add the clause ~c to F[1]...F[idx]
 
+
     Cube get_next(const Cube &c);
     ///< return the cube c'
 
@@ -307,7 +308,6 @@ private:
     ///< such that c & T => c'. Return true and replace cubes with found
     ///< sublcause, if one exists. Otherwise, return false.
 
-
     void print_frames();
     ///< print all cubes in frames to stdout
 
@@ -317,6 +317,8 @@ private:
 
     void get_old_frame(std::vector<Cube> &frame);
     ///< returns all cubes in the frames for the last model checked
+
+    void remove_unused_vars();
 
     inline void frame_repair(unsigned int idx, std::list<Cube *> &frame);
 
