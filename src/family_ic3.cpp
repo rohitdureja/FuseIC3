@@ -98,21 +98,24 @@ bool FamilyIC3::prove()
         }
 
 
+
+
+        if(simulate_last_cex()) {
+            // last cex holds in the model being checked
+            last_checked_ = false;
+            cex_ = last_cex_;
+            model_count_++;
+            old_frames_.clear();
+            return false;
+        }
+
         // find minimal subclause of last known invariant that is inductive
         // with respect to the current model.
         //
         // The implementation follows the description in the paper
         // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
         //   Formal Verification of Hardware. FMCAD 2011
-        //if(opts_.algorithm == 1) {
-            if(simulate_last_cex()) {
-                // last cex holds in the model being checked
-                last_checked_ = false;
-                cex_ = last_cex_;
-                model_count_++;
-                old_frames_.clear();
-                return false;
-          //  }
+        if(opts_.algorithm == 1) {
             if(invariant_finder(min_clause_)) {
                 logger(2) << "Found minimal inductive subclause"
                           << endlog;
@@ -137,7 +140,7 @@ bool FamilyIC3::prove()
         if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
             std::list<Cube *> frame;
-            if(!check_frame_invariant(depth(), frame))
+            while(!check_frame_invariant(depth(), frame))
                 frame_repair(depth(), frame);
 
             if (propagate()) {
@@ -344,7 +347,9 @@ bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
 
         // copy old frames
         inv.clear();
+
         get_old_frame(inv);
+
 
         // at this point temp is a vector of cubes. since we are interested
         // in clauses, we use negation in all operations
@@ -717,53 +722,56 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
 
         get_old_frame(idx, frame);
 
-        std::vector<Cube> pcubes;
-        for(std::list<Cube *>::iterator it = frame.begin();
-            it != frame.end(); ++it) {
-            Cube * c = *it;
-
-            // get next state version of cube
-            if(!c->empty()) {
-                Cube cp = get_next(*c);
-                pcubes.push_back(cp);
-                logger(2) << endlog;
-                logcube(2,cp);
-                logger(2) << endlog;
-            }
-        }
-
-        solver_.add_disjunct_cubes(pcubes);
-
-        bool sat = solve();
-
-        solver_.pop();
-
-        if(sat) {
-            // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
-            cubes.clear();
-            std::swap(cubes, frame);
-            return false;
-        }
-        else {
-            // add F[idx] from old frames to new frames
-            std::cout << "---------------------------------\n";
+//        if(!frame.empty()) {
+            std::vector<Cube> pcubes;
             for(std::list<Cube *>::iterator it = frame.begin();
                 it != frame.end(); ++it) {
                 Cube * c = *it;
-                if(!c->empty()) {
-                    if(block(*c, idx, nullptr, false)) {
-                        add_blocked(*c, idx);
-//                    else
-                        c->clear();
-                    }
 
+                // get next state version of cube
+                if(!c->empty()) {
+                    Cube cp = get_next(*c);
+                    pcubes.push_back(cp);
+                    logger(2) << endlog;
+                    logcube(2,cp);
+                    logger(2) << endlog;
                 }
             }
-            print_frames();
-            cubes.clear();
-            std::swap(cubes, frame);
-            return true;
-        }
+
+            solver_.add_disjunct_cubes(pcubes);
+
+            bool sat = solve();
+
+            solver_.pop();
+
+            if(sat) {
+                // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
+                cubes.clear();
+                std::swap(cubes, frame);
+                return false;
+            }
+            else {
+                // add F[idx] from old frames to new frames
+                std::cout << "---------------------------------\n";
+                std::cout << frame.size() << std::endl;
+                for(std::list<Cube *>::iterator it = frame.begin();
+                    it != frame.end(); ++it) {
+                    Cube * c = *it;
+
+                    if(!c->empty()) {
+//                        if(block(*c, idx, nullptr, false)) {
+                            add_blocked(*c, idx);
+    //                    else
+                            c->clear();
+//                        }
+
+                    }
+                }
+                print_frames();
+                cubes.clear();
+                return true;
+            }
+//        }
     }
     return true;
 }
@@ -885,12 +893,12 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
                 std::cout << "phase 2" << std::endl;
                 exit(-3);
                 // TODO: generalization appears here
-                if(!c->empty()) {
-                   // if(block(*c, idx, nullptr, false))
-                        add_blocked(*c, idx);
-                   // else
-                    //    c->clear();
-                }
+//                if(!c->empty()) {
+//                   // if(block(*c, idx, nullptr, false))
+//                        add_blocked(*c, idx);
+//                   // else
+//                    //    c->clear();
+//                }
             }
 
         }
@@ -950,14 +958,6 @@ void FamilyIC3::new_frame()
         frames_.push_back(Frame());
 
     frame_labels_.push_back(make_label("frame"));
-
-    if(depth() == 1 && opts_.algorithm == 1 && !min_clause_.empty()){
-        for(Cube c : min_clause_) {
-            frames_[depth()].push_back(c);
-            add_blocked(c, depth());
-        }
-
-    }
 }
 
 
@@ -1512,10 +1512,12 @@ void FamilyIC3::get_old_frame(std::vector<Cube> &frame)
 {
     frame.clear();
     Cube * c;
-    for(std::list<Cube>::iterator it = old_frames_[0].begin() ;
-        it != old_frames_[0].end() ; ++it) {
-        c = &*it;
-        frame.push_back(*c);
+    if(old_frames_.size() > 0) {
+        for(std::list<Cube>::iterator it = old_frames_[0].begin() ;
+            it != old_frames_[0].end() ; ++it) {
+            c = &*it;
+            frame.push_back(*c);
+        }
     }
 
 }
