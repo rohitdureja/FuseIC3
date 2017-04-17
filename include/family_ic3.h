@@ -154,6 +154,7 @@ private:
         std::vector<ProofObligation *> store_;
     };
 
+    enum type_ { cex, invar, pdr, init };
 
     //------------------------------------------------------------------------
     // major methods
@@ -300,6 +301,9 @@ private:
     bool consecution_check(const std::vector<TermList> &inv);
     ///< check if invariant satisfies consecution, Inv & T => Inv'
 
+    bool property_check(const std::vector<TermList> &inv);
+    ///< check if invariant satisfies property, Inv => P
+
     void remove_clauses_violating_init(std::vector<TermList> &cubes);
     ///< remove clauses from cubes not in the initial states set
 
@@ -406,18 +410,18 @@ private:
     std::vector<TermList> last_invariant_;
     ///< invariant from previous run of verification
 
-    std::vector<Cube> minimal_subclause_;
-    ///< minimal inductive subclause from last known invariant
-
-    msat_term minimal_subclause_label_;
-    ///< activation label for minimal inductive
-
     unsigned int frame_number = 0;
     ///< maintain current active frame
 
     std::vector<std::list<Cube>> old_frames_;
 
     std::vector<Cube> min_clause_;
+    ///< minimal inductive subclause from last known invariant
+
+    msat_term min_clause_label_;
+    ///< minimal inductive subclause activation literal
+
+    type_ check_type_;
 
     //------------------------------------------------------------------------
     // statistics
