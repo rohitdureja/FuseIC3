@@ -83,8 +83,8 @@ bool FamilyIC3::prove()
 
     remove_unused_vars();
 
+    std::cout << old_frames_.size() << std::endl;
 //    std::cout << "here\n";
-
     // to maintain time, defined in utils.h
     TimeKeeper t(total_time_);
 
@@ -259,6 +259,8 @@ void FamilyIC3::save_stats() const
     xmlfile << "</result>" << std::endl;
 
     xmlfile << "</statistics>" << std::endl;
+
+    xmlfile.close();
 }
 
 
@@ -545,14 +547,57 @@ bool FamilyIC3::propagate()
         for (Cube &c : to_add) {
             add_blocked(c, k+1);
         }
-        if (frames_[k].empty()) {
-            // fixpoint: frames_[k] == frames_[k+1]
-            break;
+
+        if(opts_.algorithm > 2 && k > old_frames_.size() && old_frame_extended_) {
+            if (frames_[k].empty()) {
+                // fixpoint: frames_[k] == frames_[k+1]
+                break;
+            }
+        }
+        if(opts_.algorithm > 2 && model_count_ > 1 && old_frames_.size() > 0) {
+            // check if frame k equals frame k + 1
+            // we first check this using sat?(frames_[k] & !frames_[k+1])
+            // activate frames_[k]
+            activate_frame(k);
+
+            solver_.push();
+            // add new frames
+            solver_.add_disjunct_cubes(frames_[k+1]);
+
+            // add old frames
+            std::list<Cube *> frame;
+            std::vector<Cube> ff;
+            get_old_frame(k+1, frame);
+            if(frame.size() > 0) {
+
+                for(std::list<Cube *>::iterator it = frame.begin();
+                    it != frame.end(); ++it) {
+                    Cube * c = *it;
+                    if(!c->empty())
+                        ff.push_back(*c);
+                }
+            }
+            if(!ff.empty())
+                solver_.add_disjunct_cubes(ff);
+
+            bool res = solve();
+
+            solver_.pop();
+
+            if(res) {
+                break;
+            }
+        }
+        else {
+            if (frames_[k].empty()) {
+                // fixpoint: frames_[k] == frames_[k+1]
+                break;
+            }
         }
     }
 
     if (k < depth()) {
-        logger(2) << "fixpoint found at frame " << k << endlog;
+        logger(1) << "fixpoint found at frame " << k << endlog;
         logger(2) << "invariant:" << endlog;
         last_checked_ = true;
         invariant_.clear();
@@ -720,71 +765,84 @@ void FamilyIC3::push(Cube &c, unsigned int &idx)
 
 bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes)
 {
-    if (idx > 0 && idx < old_frames_.size()-1) {
+    if(!old_frame_extended_) {
+        if (idx > 0 && idx <= old_frames_.size() - 1) {
 
-//        std::cout << "index: " << idx << std::endl;
+            print_frames();
+            // activate trans
+            activate_trans_bad(true, false);
 
-        print_frames();
-        // activate trans
-        activate_trans_bad(true, false);
+            // activate frame F[idx-1]
+            activate_frame(idx-1);
 
-        // activate frame F[idx-1]
-        activate_frame(idx-1);
+            // create temporary assertion
+            solver_.push();
 
-        // create temporary assertion
-        solver_.push();
+            std::list<Cube *> frame;
 
-        std::list<Cube *> frame;
+            get_old_frame(idx, frame);
 
-        get_old_frame(idx, frame);
-
-        std::vector<Cube> pcubes;
-        for(std::list<Cube *>::iterator it = frame.begin();
-            it != frame.end(); ++it) {
-            Cube * c = *it;
-
-            // get next state version of cube
-            if(!c->empty()) {
-                Cube cp = get_next(*c);
-                pcubes.push_back(cp);
-                logger(3) << endlog;
-                logcube(3,cp);
-                logger(3) << endlog;
-            }
-        }
-
-        solver_.add_disjunct_cubes(pcubes);
-
-        bool sat = solve();
-
-        solver_.pop();
-
-        if(sat) {
-            // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
-            cubes.clear();
-            std::swap(cubes, frame);
-            return false;
-        }
-        else {
-            // add F[idx] from old frames to new frames
-//            std::cout << "---------------------------------\n";
+            std::vector<Cube> pcubes;
             for(std::list<Cube *>::iterator it = frame.begin();
                 it != frame.end(); ++it) {
                 Cube * c = *it;
-
+                // get next state version of cube
                 if(!c->empty()) {
-//                        if(block(*c, idx, nullptr, false)) {
-//                        add_blocked(*c, idx);
-//                    else
-//                        c->clear();
-//                        }
-                    add_old_frame(*c, idx);
-
+                    Cube cp = get_next(*c);
+                    pcubes.push_back(cp);
+                    logger(3) << endlog;
+                    logcube(3,cp);
+                    logger(3) << endlog;
                 }
             }
-            print_frames();
+
+            solver_.add_disjunct_cubes(pcubes);
+
+            bool sat = solve();
+
+            solver_.pop();
+
+            if(sat) {
+                // F[idx-1] & T & ~F[idx] is satisfiable, we repair frame
+                cubes.clear();
+                std::swap(cubes, frame);
+                return false;
+            }
+            else {
+                // add F[idx] from old frames to new frames
+                std::cout << "---------------------------------\n";
+                for(std::list<Cube *>::iterator it = frame.begin();
+                    it != frame.end(); ++it) {
+                    Cube * c = *it;
+
+                    if(!c->empty()) {
+    //                        if(block(*c, idx, nullptr, false)) {
+    //                        add_blocked(*c, idx);
+    //                    else
+    //                        c->clear();
+    //                        }
+                        add_old_frame(*c, idx);
+
+                    }
+                }
+                print_frames();
+                cubes.clear();
+                return true;
+            }
+        }
+        else if (idx > old_frames_.size() - 1)
+        {
+            // copy the last old frame to a new
+            std::list<Cube> tmp;
+            auto it = old_frames_.rbegin();
+            old_frames_.push_back(*it);
+            old_frame_extended_ = true;
             cubes.clear();
-            return true;
+            std::cout << "old frame xtneded\n";
+            std::list<Cube *> frame;
+            get_old_frame(idx, frame);
+            std::swap(cubes, frame);
+            return false;
         }
     }
     return true;
@@ -795,11 +853,12 @@ void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
     logger(1) << "Attempting Lavish Frame Repair at idx: " << idx
               << endlog;
 
+//    exit(-3);
     if(idx > 0) {
         // find clauses responsible
         std::list<Cube *> cubes;
         find_cubes_at_fault(idx, frame, cubes);
-//        std::cout << "Fault cubes: " << cubes.size() << std::endl;
+        std::cout << "Fault cubes: " << cubes.size() << std::endl;
         // we start repairing each cube in the list of cubes
         // in lavish frame repair, these cubes are simply dropped.
 
@@ -808,7 +867,15 @@ void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
             Cube * c = *it;
             c->clear();
         }
-
+        if(old_frame_extended_) {
+            // add frame contents to main new frame
+            for(std::list<Cube *>::iterator it = frame.begin();
+               it != frame.end(); ++it) {
+               Cube * c = *it;
+               if(!c->empty())
+                   add_blocked(*c, idx);
+            }
+        }
         //reset_solver();
         return;
     }
@@ -1261,21 +1328,28 @@ void FamilyIC3::soft_reset()
     // reset solver
     solver_.reset();
 
-
-
     // store old frames
+    std::vector<std::list<Cube>> temp;
+    temp = old_frames_;
+    old_frames_.clear();
     if(frames_.size() > 1 && check_type_ == pdr) {
-        old_frames_.clear();
         for(unsigned int i = 1 ; i < frames_.size() ; ++i) {
             std::list<Cube> lst;
             for(Cube c : frames_[i]) {
-                lst.push_back(c);
-            }
-            if(!lst.empty()) {
-                old_frames_.push_back(lst);
+                if(i < temp.size())
+                    temp[i-1].push_back(c);
+                else {
+                    lst.push_back(c);
+                    temp.push_back(lst);
+                }
             }
         }
     }
+    std::swap(temp, old_frames_);
+
+    if(old_frames_.size() == 1)
+        old_frames_.clear();
+
 
     last_checked_ = false;
     // reset internal state
@@ -1291,6 +1365,7 @@ void FamilyIC3::soft_reset()
     last_reset_calls_ = 0;
     frame_number = 0;
     vp_.id_reset();
+    old_frame_extended_ = false;
 
 }
 
@@ -1313,6 +1388,21 @@ void FamilyIC3::reset_solver()
         msat_term l = frame_labels_[i];
         for (Cube &c : frames_[i]) {
             solver_.add_cube_as_clause(c, l);
+        }
+    }
+
+    // re-add the old_frame contents
+    if(old_frames_.size() > 0) {
+        for(unsigned int idx = 1 ; idx < old_frames_.size() ; ++idx) {
+            std::list<Cube *> frame;
+            get_old_frame(idx, frame);
+            for(std::list<Cube *>::iterator it = frame.begin();
+                it != frame.end() ; ++it) {
+                Cube *c = *it;
+                if(!c->empty()) {
+                    add_old_frame(*c, idx);
+                }
+            }
         }
     }
 }

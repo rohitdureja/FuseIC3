@@ -21,6 +21,7 @@
 
 
 #include <iostream>
+#include <fstream>
 #include <stdlib.h>
 #include <signal.h>
 #include <family_ic3.h>
@@ -294,6 +295,9 @@ int main(int argc, const char **argv)
     // vector to store files
     std::vector<std::string> files;
 
+    // map to store result of verification
+    std::unordered_map<std::string, bool> rmap;
+
     // parse directory and retrieve files ending in .vmt
     if((dir = opendir(options.filename.c_str())) != nullptr) {
         // print all files in the directory
@@ -357,6 +361,9 @@ int main(int argc, const char **argv)
         // check the transition system
         bool safe = fic3.prove();
 
+        // add result to map
+        rmap.insert(std::pair<std::string, bool>(file, safe));
+
         if (options.witness) {
             std::vector<TermList> wit;
             if (!fic3.witness(wit)) {
@@ -384,6 +391,33 @@ int main(int argc, const char **argv)
 //        getchar();
 
     }
+
+    // write result map as xml file
+    std::ofstream xmlfile;
+
+    std::string fname;
+    if(options.algorithm == 0)
+        fname = "original.log.xml";
+    else if(options.algorithm == 1)
+        fname = "chockler.log.xml";
+    else if(options.algorithm == 3)
+        fname = "nexus.log.xml";
+
+    xmlfile.open(fname);
+
+    xmlfile << "<results>" << std::endl;
+    for(std::unordered_map<std::string, bool>::iterator it = rmap.begin();
+            it != rmap.end() ; ++it)
+    {
+        xmlfile << "<model>" << std::endl;
+        xmlfile << "<name>" << it->first << "</name>" << std::endl;
+        xmlfile << "<result>" << (it->second ? "True" : "False") << "</result>" << std::endl;
+        xmlfile << "</model>" << std::endl;
+    }
+
+    xmlfile << "</results>" << std::endl;
+    xmlfile.close();
+
 
     // back to home directory
     if(chdir(cwd.c_str()) < 0) {
