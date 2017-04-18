@@ -232,6 +232,8 @@ private:
     void add_blocked(Cube &c, unsigned int idx);
     ///< add the clause ~c to F[1]...F[idx]
 
+    inline void add_old_frame(Cube &c, unsigned int idx);
+    ///< add the clause ~c to F[1]...F[idx]
 
     Cube get_next(const Cube &c);
     ///< return the cube c'
@@ -365,6 +367,8 @@ private:
     ///< removed from frames_[i] before adding it  to frames_[i+1].
     ///< Therefore, a fixpoint can be detected by simply checking if frames_[j]
     ///< is empty
+
+    FrameList base_frames_;
 
     TermList frame_labels_;
     ///< activation labels for trace elements. Given the delta encoding

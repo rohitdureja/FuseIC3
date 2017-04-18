@@ -116,6 +116,7 @@ bool FamilyIC3::prove()
         // The implementation follows the description in the paper
         // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
         //   Formal Verification of Hardware. FMCAD 2011
+        //
         if(opts_.algorithm == 1) {
             min_clause_.clear();
             if(invariant_finder(min_clause_)) {
@@ -773,10 +774,11 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
 
                 if(!c->empty()) {
 //                        if(block(*c, idx, nullptr, false)) {
-                        add_blocked(*c, idx);
+//                        add_blocked(*c, idx);
 //                    else
-                        c->clear();
+//                        c->clear();
 //                        }
+                    add_old_frame(*c, idx);
 
                 }
             }
@@ -1021,6 +1023,43 @@ void FamilyIC3::add_blocked(Cube &c, unsigned int idx)
     ++num_added_cubes_;
     max_cube_size_ = std::max(uint32_t(c.size()), max_cube_size_);
     avg_cube_size_ += (double(c.size()) - avg_cube_size_) / num_added_cubes_;
+}
+
+
+inline void FamilyIC3::add_old_frame(Cube &c, unsigned int idx)
+{
+    solver_.add_cube_as_clause(c, frame_labels_[idx]);
+
+//    // whenever we add a clause ~c to an element of F, we also remove subsumed
+//    // clauses. This automatically keeps frames_ in a "delta encoded" form, in
+//    // which each clause is stored only in the last frame in which it
+//    // occurs. However, this does not remove subsumed clauses from the
+//    // underlying SMT solver. We address this by resetting the solver every
+//    // once in a while (see the comment in rec_block())
+//    for (size_t d = 1; d < idx+1; ++d) {
+//        Frame &fd = frames_[d];
+//        size_t j = 0;
+//        for (size_t i = 0; i < fd.size(); ++i) {
+//            if (!subsumes(c, fd[i])) {
+//                fd[j++] = fd[i];
+//            } else {
+//                ++num_subsumed_cubes_;
+//            }
+//        }
+//        fd.resize(j);
+//    }
+//
+//    solver_.add_cube_as_clause(c, frame_labels_[idx]);
+//    frames_[idx].push_back(c);
+//
+//    logger(2) << "adding cube of size " << c.size() << " at level " << idx
+//              << ": ";
+//    logcube(3, c);
+//    logger(2) << endlog;
+//
+//    ++num_added_cubes_;
+//    max_cube_size_ = std::max(uint32_t(c.size()), max_cube_size_);
+//    avg_cube_size_ += (double(c.size()) - avg_cube_size_) / num_added_cubes_;
 }
 
 
