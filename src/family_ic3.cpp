@@ -83,8 +83,6 @@ bool FamilyIC3::prove()
 
     remove_unused_vars();
 
-    std::cout << old_frames_.size() << std::endl;
-//    std::cout << "here\n";
     // to maintain time, defined in utils.h
     TimeKeeper t(total_time_);
 
@@ -548,7 +546,7 @@ bool FamilyIC3::propagate()
             add_blocked(c, k+1);
         }
 
-        if(opts_.algorithm > 2 && k > old_frames_.size() && old_frame_extended_) {
+        if(opts_.algorithm > 2 && k > old_frames_.size()-1 && old_frame_extended_) {
             if (frames_[k].empty()) {
                 // fixpoint: frames_[k] == frames_[k+1]
                 break;
@@ -1057,7 +1055,6 @@ void FamilyIC3::generalize_and_push(Cube &c, unsigned int &idx)
     push(c, idx);
 }
 
-
 void FamilyIC3::add_blocked(Cube &c, unsigned int idx)
 {
     // whenever we add a clause ~c to an element of F, we also remove subsumed
@@ -1329,27 +1326,23 @@ void FamilyIC3::soft_reset()
     solver_.reset();
 
     // store old frames
-    std::vector<std::list<Cube>> temp;
-    temp = old_frames_;
-    old_frames_.clear();
-    if(frames_.size() > 1 && check_type_ == pdr) {
-        for(unsigned int i = 1 ; i < frames_.size() ; ++i) {
-            std::list<Cube> lst;
-            for(Cube c : frames_[i]) {
-                if(i < temp.size())
-                    temp[i-1].push_back(c);
-                else {
+    if(opts_.algorithm> 2) {
+        if(frames_.size() > old_frames_.size() && check_type_ == pdr) {
+            old_frames_.clear();
+            for(unsigned int i = 1 ; i < frames_.size() ; ++i) {
+                std::list<Cube> lst;
+                for(Cube c : frames_[i]) {
                     lst.push_back(c);
-                    temp.push_back(lst);
+                }
+                if(!lst.empty()) {
+                    old_frames_.push_back(lst);
                 }
             }
         }
+
+        if(old_frames_.size() == 1)
+            old_frames_.clear();
     }
-    std::swap(temp, old_frames_);
-
-    if(old_frames_.size() == 1)
-        old_frames_.clear();
-
 
     last_checked_ = false;
     // reset internal state
