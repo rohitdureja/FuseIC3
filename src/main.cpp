@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define VERSION "0.0.1a"
+#define VERSION "0.1.0a"
 
 
 using namespace nexus;
@@ -387,8 +387,6 @@ int main(int argc, const char **argv)
         fic3.save_stats();
 
         std::cout << (safe ? "safe" : "unsafe") << std::endl;
-
-//        getchar();
 
     }
 

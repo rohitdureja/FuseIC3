@@ -324,7 +324,7 @@ private:
     void get_old_frame(std::vector<Cube> &frame);
     ///< returns all cubes in the frames for the last model checked
 
-    void remove_unused_vars();
+    void apply_cone_of_influence();
 
     inline void frame_repair(unsigned int idx, std::list<Cube *> &frame);
 
