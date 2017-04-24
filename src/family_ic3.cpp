@@ -222,7 +222,14 @@ void FamilyIC3::save_stats() const
     std::ofstream xmlfile;
     std::string fl = opts_.filename;
     fl.erase(fl.end()-4, fl.end());
-    xmlfile.open(fl + ".log.xml");
+    std::string filename;
+    if(opts_.algorithm == 0)
+        filename = ".original";
+    else if(opts_.algorithm == 1)
+        filename = ".chockler";
+    else if(opts_.algorithm == 3)
+        filename = ".nexus";
+    xmlfile.open(fl + filename + ".log.xml");
 
 #define save_stat(name, value) \
     xmlfile << "<" << name ">" << std::setprecision(3) << std::fixed \
@@ -1307,7 +1314,34 @@ void FamilyIC3::soft_reset()
     min_clause_.clear();
     tmp_.clear();
     gen_needed_.clear();
+
+
+    // reset measured parameters
     last_reset_calls_ = 0;
+    num_solve_calls_ = 0;
+    num_solve_sat_calls_ = 0;
+    num_solve_unsat_calls_ = 0;
+
+    num_solver_reset_ = 0;
+
+    num_added_cubes_ = 0;
+    num_subsumed_cubes_ = 0;
+
+    num_block_ = 0;
+
+    max_cube_size_ = 0;
+    avg_cube_size_ = 0;
+
+    solve_time_ = 0;
+    solve_sat_time_ = 0;
+    solve_unsat_time_ = 0;
+    block_time_ = 0;
+    generalize_and_push_time_ = 0;
+    rec_block_time_ = 0;
+    propagate_time_ = 0;
+    total_time_ = 0;
+
+
     frame_number = 0;
     vp_.id_reset();
     old_frame_extended_ = false;
