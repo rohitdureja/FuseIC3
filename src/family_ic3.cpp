@@ -83,13 +83,13 @@ bool FamilyIC3::prove()
 
     apply_cone_of_influence();
 
-    // to maintain time, defined in utils.h
-    TimeKeeper t(total_time_);
-
     // check if last found invariant is valid in the new model
     if(opts_.family) {
         if(opts_.algorithm > 1) {
+            // to maintain time, defined in utils.h
+            TimeKeeper t(total_time_);
             if(initial_invariant_check()) {
+
                 last_checked_ = true;
                 model_count_++;
                 check_type_ = invar;
@@ -97,14 +97,15 @@ bool FamilyIC3::prove()
             }
         }
 
-        if(opts_.family > 2 && simulate_last_cex()) {
-            // last cex holds in the model being checked
-            last_checked_ = false;
-            cex_ = last_cex_;
-            model_count_++;
-            check_type_ = cex;
-            return false;
-        }
+//        if(opts_.algorithm > 2 && simulate_last_cex()) {
+//
+//            // last cex holds in the model being checked
+//            last_checked_ = false;
+//            cex_ = last_cex_;
+//            model_count_++;
+//            check_type_ = cex;
+//            return false;
+//        }
 
         // find minimal subclause of last known invariant that is inductive
         // with respect to the current model.
@@ -115,6 +116,8 @@ bool FamilyIC3::prove()
         //
         if(opts_.algorithm == 1) {
             min_clause_.clear();
+            // to maintain time, defined in utils.h
+            TimeKeeper t(total_time_);
             if(invariant_finder(min_clause_)) {
                 logger(1) << "Found minimal inductive subclause"
                           << endlog;
@@ -126,11 +129,17 @@ bool FamilyIC3::prove()
         }
     }
 
-    if (!check_init()) {
-        last_checked_ = false;
-        model_count_++;
-        check_type_ = init;
-        return false;
+    {
+        // to maintain time, defined in utils.h
+        TimeKeeper t(total_time_);
+
+        if (!check_init()) {
+
+            last_checked_ = false;
+            model_count_++;
+            check_type_ = init;
+            return false;
+        }
     }
 
     // increment frame count
@@ -143,10 +152,16 @@ bool FamilyIC3::prove()
         if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
             std::list<Cube *> frame;
-            while(!check_frame_invariant(depth(), frame))
+            while(!check_frame_invariant(depth(), frame)) {
+                // to maintain time, defined in utils.h
+                TimeKeeper t(total_time_);
                 frame_repair(depth(), frame);
+            }
 
+            // to maintain time, defined in utils.h
+            TimeKeeper t(total_time_);
             if (propagate()) {
+
                 model_count_ += 1;
                 print_frames();
                 check_type_ = pdr;
@@ -154,20 +169,27 @@ bool FamilyIC3::prove()
             }
         }
 
-        while (get_bad(bad)) {
+        {
+            // to maintain time, defined in utils.h
+            TimeKeeper t(total_time_);
+            while (get_bad(bad)) {
 
-            if (!rec_block(bad)) {
-                logger(1) << "found counterexample at depth " << depth()
-                          << endlog;
-                model_count_ += 1;
-                print_frames();
-                check_type_ = pdr;
-                return false;
+                if (!rec_block(bad)) {
+                    logger(1) << "found counterexample at depth " << depth()
+                              << endlog;
+                    model_count_ += 1;
+                    print_frames();
+                    check_type_ = pdr;
+                    return false;
+                }
             }
         }
         new_frame();
         if(opts_.algorithm <=2 || model_count_ < 1) {
+            // to maintain time, defined in utils.h
+            TimeKeeper t(total_time_);
             if (propagate()) {
+
                 model_count_ += 1;
                 print_frames();
                 check_type_ = pdr;
@@ -545,7 +567,6 @@ bool FamilyIC3::propagate()
         Frame &f = frames_[k];
         // forward propagation: try to see if f[k] is inductive relative to
         // F[k+1]
-//        bool iempty = frames_[k].empty();
         for (size_t i = 0; i < f.size(); ++i) {
             to_add.push_back(Cube());
 
