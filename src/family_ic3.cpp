@@ -97,7 +97,7 @@ bool FamilyIC3::prove()
             }
         }
 
-        if(simulate_last_cex()) {
+        if(opts_.family > 2 && simulate_last_cex()) {
             // last cex holds in the model being checked
             last_checked_ = false;
             cex_ = last_cex_;
@@ -298,7 +298,7 @@ bool FamilyIC3::simulate_last_cex()
 {
     if(model_count_ > 0 && !last_cex_.empty()) {
 
-        logger(2) << "Checking last known counterexample" << endlog;
+        logger(1) << "Checking last known counterexample" << endlog;
         // first check if first state in the cex intersects
         // with one of the initial states
 
@@ -308,12 +308,28 @@ bool FamilyIC3::simulate_last_cex()
         // create temporary assertion
         solver_.push();
 
-        // add first state of cex
+        // check first state of cex
         solver_.add_cube_as_cube(last_cex_[0]);
 
         bool sat = solve();
 
+        if (!sat)
+            return false;
+
         solver_.pop();
+
+        // create temporary assertion
+        solver_.push();
+
+        activate_trans_bad(false, true);
+
+        // check last state of cex
+        solver_.add_cube_as_cube(last_cex_.back());
+
+        sat = solve();
+
+        solver_.pop();
+
 
         // if sat, the initial state is valid, and we proceed with
         // checking the rest of the cex. otherwise, the cex is invalid.
@@ -332,7 +348,7 @@ bool FamilyIC3::simulate_last_cex()
                 solver_.add_cube_as_cube(last_cex_[i]);
 
                 // add (i+1)th state from cex (next state)
-                solver_.add_cube_as_cube(get_next(last_cex_[i+1]));
+                solver_.add_cube_as_clause(get_next(last_cex_[i+1]));
 
                 sat = solve();
 
@@ -1682,7 +1698,7 @@ void FamilyIC3::apply_cone_of_influence()
                     for(unsigned int i = 0 ; i < c.size() ;) {
                         auto jt = lbl2next_.find(var(c[i]));
                         if(jt == lbl2next_.end()) {
-                            c.erase(c.begin() + i);
+                                c.erase(c.begin() + i);
                         }
                         else {
                             ++i;
@@ -1741,7 +1757,9 @@ void FamilyIC3::apply_cone_of_influence()
         for(unsigned int i = 0 ; i < c.size() ;) {
             auto it = lbl2next_.find(var(c[i]));
             if(it == lbl2next_.end()) {
-                c.erase(c.begin() + i);
+                // check if input
+                if(!ts_->is_inputvar(var(c[i])))
+                    c.erase(c.begin() + i);
             }
             else {
                 ++i;
