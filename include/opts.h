@@ -1,5 +1,5 @@
 /*
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -41,7 +41,7 @@
 
 #include <string>
 
-namespace nexus {
+namespace fuse {
 
 struct Options {
     int verbosity;
@@ -64,4 +64,4 @@ struct Options {
     }
 };
 
-} // namespace nexus
+} // namespace FuseIC3

@@ -1,5 +1,5 @@
 /*
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -44,7 +44,7 @@
 #include "assert.h"
 
 
-namespace nexus {
+namespace fuse {
 
 /**
  * A class for managing the interaction between the IC3 engine and the SMT
@@ -120,4 +120,4 @@ private:
     ///< subset of assumptions sufficient for unsatisfiability
 };
 
-} // namespace nexus
+} // namespace FuseIC3

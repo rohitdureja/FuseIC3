@@ -1,7 +1,7 @@
 /*
  * Basic utils and definitions
  *
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -79,7 +79,7 @@ struct hash<::msat_term> {
 } // namespace std
 
 
-namespace nexus {
+namespace fuse {
 
 /**
  * Destructor class for msat_env
@@ -380,4 +380,4 @@ private:
 };
 
 
-} // namespace nexus
+} // namespace FuseIC3

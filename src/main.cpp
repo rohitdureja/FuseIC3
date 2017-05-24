@@ -1,5 +1,5 @@
 /*
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -24,24 +24,24 @@
 #include <fstream>
 #include <stdlib.h>
 #include <signal.h>
-#include <family_ic3.h>
 #include <dirent.h>
 #include <algorithm>
 #include <unistd.h>
 #include <string.h>
+#include "../include/fuse.h"
 
-#define VERSION "0.1.0a"
+#define VERSION "0.1.1a"
 
 
-using namespace nexus;
+using namespace fuse;
 
 // pointer to algorithm instances
-FamilyIC3 *family_ic3 = NULL;
+FuseIC3 *fuse_ic3 = NULL;
 
 
 /** \brief Handler for raised interrupts
  *
- * This functions handles interrupts raised during the execution of Nexus
+ * This functions handles interrupts raised during the execution of FuseIC3
  *
  * \return 	None
  *
@@ -49,8 +49,8 @@ FamilyIC3 *family_ic3 = NULL;
  */
 void handle_interrupt(int signo)
 {
-    if (family_ic3) {
-        family_ic3->print_stats();
+    if (fuse_ic3) {
+        fuse_ic3->print_stats();
     }
     std::cout 	<< "interrupted by signal " << signo << "\nunknown"
     			<< std::endl;
@@ -225,28 +225,28 @@ Options parse_options(int argc, const char **argv)
         } else if (a == "-p") {
             ret.stack = false;
         } else if (a == "-h" || a == "-help" || a == "--help") {
-            std::cout << "Nexus Model Checker [" << VERSION << "]"
+            std::cout << "FuseIC3 Algorithm [" << VERSION << "]"
                       << "\nUsage: \t" << argv[0] << " [options] folder\n"
                       << "\n Algorithm options"
                       << "\n   -p           priority-queue proof obligation management (default: false)"
                       << "\n                if not enabled, a stack-based approach is used"
-					  << "\n   -f number    enable family mode; set algorithm number between [1...4] (default: disabled)"
+					  << "\n   -f number    enable model-set mode; set algorithm number between [1...4] (default: disabled)"
 					  << "\n   folder       path of folder containing .vmt files to check (required)"
 					  << "\n\n Miscellaneous"
                       << "\n   -v level     set verbosity level (default: 0)"
                       << "\n   -w           print witness (default: false)"
                       << "\n   -s seed      seed value for random number generator"
 					  << "\n   -h, --help   display this message\n"
-					  << "\n\n Available family checking algorithms"
+					  << "\n\n Available model-set checking algorithms"
 					  << "\n (supplied as argument with -f options)"
-					  << "\n-----------------------------------------------------------------"
-					  << "\n| Number | Algorithm                                            |"
-					  << "\n-----------------------------------------------------------------"
-					  << "\n|   1    | Algorithm by Chockler et al. (FMCAD 2011)            |"
-					  << "\n|   2    | Basic Check (re-use and check last invariant)        |"
-					  << "\n|   3    | Basic Check + Lavish Frame Repair (drop clauses)     |"
-					  << "\n|   4    | Basic Check + Sensible Frame Repair (repair clauses) |"
-					  << "\n-----------------------------------------------------------------"
+					  << "\n  -----------------------------------------------------------------"
+					  << "\n  | Number | Algorithm                                            |"
+					  << "\n  -----------------------------------------------------------------"
+					  << "\n  |   1    | Incremental IC3 (FMCAD 2011)                         |"
+					  << "\n  |   2    | Basic Check (re-use and check last invariant)        |"
+					  << "\n  |   3    | Basic Check + Drop Violating Clauses                 |"
+					  << "\n  |   4    | Basic Check + Repair Violating Clauses               |"
+					  << "\n  -----------------------------------------------------------------"
 					  << "\n\n Example usage scenarios"
 					  << "\n " << argv[0] << " folder             runs simple algorithm on files in folder"
 					  << "\n " << argv[0] << " -p folder          runs simple algorithm using priority queues on files in folder"
@@ -330,8 +330,8 @@ int main(int argc, const char **argv)
     }
 
     // create algorithm object
-    FamilyIC3 fic3(env, options);
-    family_ic3 = &fic3;
+    FuseIC3 fic3(env, options);
+    fuse_ic3 = &fic3;
 
     // start reading files and running algorithm
     for(std::string file : files) {
@@ -399,7 +399,7 @@ int main(int argc, const char **argv)
     else if(options.algorithm == 1)
         fname = "chockler.log.xml";
     else if(options.algorithm == 3)
-        fname = "nexus.log.xml";
+        fname = "FuseIC3.log.xml";
 
     xmlfile.open(fname);
 

@@ -1,7 +1,7 @@
 /*
  * Basic utils and definitions
  *
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -42,7 +42,7 @@
 
 #include "utils.h"
 
-namespace nexus {
+namespace fuse {
 
 msat_config get_config(ModelGeneration model, bool interpolation)
 {
@@ -129,4 +129,4 @@ msat_config get_config(ModelGeneration model, bool interpolation)
 
 Logger Logger::the_logger_;
 
-} // namespace nexus
+} // namespace FuseIC3

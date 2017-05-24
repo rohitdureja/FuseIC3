@@ -22,7 +22,7 @@
 #include "ts.h"
 #include <algorithm>
 
-namespace nexus {
+namespace fuse {
 
 // constructor for TransitionSystem object
 TransitionSystem::TransitionSystem(msat_env env):
@@ -137,4 +137,4 @@ msat_term TransitionSystem::next(msat_term cur_formula) const
     return apply_substitution(env_, cur_formula, cur2next_, identity);
 }
 
-} // namespace nexus
+} // namespace FuseIC3

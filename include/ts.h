@@ -23,7 +23,7 @@
 
 #include "utils.h"
 
-namespace nexus {
+namespace fuse {
 
 /**
  * A simple class for representing a transition system.
@@ -91,4 +91,4 @@ private:
     msat_term prop_;
 };
 
-} // namespace nexus
+} // namespace FuseIC3

@@ -1,5 +1,5 @@
 /*
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -45,7 +45,7 @@
 #include <random>
 #include <list>
 
-namespace nexus {
+namespace fuse {
 
 /**
  * A simple implementation of the IC3 algorithm for model families. Aimed at
@@ -53,9 +53,9 @@ namespace nexus {
  * performance.
  *
  */
-class FamilyIC3 {
+class FuseIC3 {
 public:
-    FamilyIC3(const msat_env &env, const Options &opts);
+    FuseIC3(const msat_env &env, const Options &opts);
 
     bool prove();
     ///< main method: check whether the property holds or not
@@ -453,4 +453,4 @@ private:
     double total_time_;
 };
 
-} // namespace nexus
+} // namespace FuseIC3

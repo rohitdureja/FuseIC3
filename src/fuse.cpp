@@ -1,5 +1,5 @@
 /*
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -37,17 +37,17 @@
  * along with ic3ia.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <family_ic3.h>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
 #include <fstream>
 #include <set>
+#include "../include/fuse.h"
 
 
-namespace nexus {
+namespace fuse {
 
-FamilyIC3::FamilyIC3(const msat_env &env, const Options &opts):
+FuseIC3::FuseIC3(const msat_env &env, const Options &opts):
     ts_(nullptr),
     opts_(opts),
     vp_(env),
@@ -67,7 +67,7 @@ FamilyIC3::FamilyIC3(const msat_env &env, const Options &opts):
 // public methods
 //-----------------------------------------------------------------------------
 
-void FamilyIC3::configure(const TransitionSystem *ts) {
+void FuseIC3::configure(const TransitionSystem *ts) {
 
     if(!opts_.family)
         hard_reset();
@@ -77,35 +77,30 @@ void FamilyIC3::configure(const TransitionSystem *ts) {
     ts_ = ts;
 }
 
-bool FamilyIC3::prove()
+bool FuseIC3::prove()
 {
     initialize();
-
     apply_cone_of_influence();
+    TimeKeeper t(total_time_);
 
     // check if last found invariant is valid in the new model
     if(opts_.family) {
         if(opts_.algorithm > 1) {
-            // to maintain time, defined in utils.h
-            TimeKeeper t(total_time_);
             if(initial_invariant_check()) {
-
                 last_checked_ = true;
                 model_count_++;
                 check_type_ = invar;
                 return true;
             }
         }
-
-//        if(opts_.algorithm > 2 && simulate_last_cex()) {
-//
-//            // last cex holds in the model being checked
-//            last_checked_ = false;
-//            cex_ = last_cex_;
-//            model_count_++;
-//            check_type_ = cex;
-//            return false;
-//        }
+        if(simulate_last_cex()) {
+            // last cex holds in the model being checked
+            last_checked_ = false;
+            cex_ = last_cex_;
+            model_count_++;
+            check_type_ = cex;
+            return false;
+        }
 
         // find minimal subclause of last known invariant that is inductive
         // with respect to the current model.
@@ -113,11 +108,8 @@ bool FamilyIC3::prove()
         // The implementation follows the description in the paper
         // - Chockler, H., Ivrii, A., Matsliah, A., Moran, S., & Nevo, Z. Incremental
         //   Formal Verification of Hardware. FMCAD 2011
-        //
         if(opts_.algorithm == 1) {
             min_clause_.clear();
-            // to maintain time, defined in utils.h
-            TimeKeeper t(total_time_);
             if(invariant_finder(min_clause_)) {
                 logger(1) << "Found minimal inductive subclause"
                           << endlog;
@@ -126,20 +118,17 @@ bool FamilyIC3::prove()
                     solver_.add_cube_as_clause(c, min_clause_label_);
                 }
             }
+            else
+                min_clause_.clear();
         }
     }
 
-    {
-        // to maintain time, defined in utils.h
-        TimeKeeper t(total_time_);
+    if (!check_init()) {
 
-        if (!check_init()) {
-
-            last_checked_ = false;
-            model_count_++;
-            check_type_ = init;
-            return false;
-        }
+        last_checked_ = false;
+        model_count_++;
+        check_type_ = init;
+        return false;
     }
 
     // increment frame count
@@ -147,21 +136,13 @@ bool FamilyIC3::prove()
 
     while (true) {
         Cube bad;
-
-        // in family algorithm 3 and 4, frame repair is performed.
         if(opts_.algorithm > 2 && model_count_ > 0) {
             // check if F[i-1] & T |= F[i]'
             std::list<Cube *> frame;
             while(!check_frame_invariant(depth(), frame)) {
-                // to maintain time, defined in utils.h
-                TimeKeeper t(total_time_);
                 frame_repair(depth(), frame);
             }
-
-            // to maintain time, defined in utils.h
-            TimeKeeper t(total_time_);
             if (propagate()) {
-
                 model_count_ += 1;
                 print_frames();
                 check_type_ = pdr;
@@ -169,25 +150,20 @@ bool FamilyIC3::prove()
             }
         }
 
-        {
-            // to maintain time, defined in utils.h
-            TimeKeeper t(total_time_);
-            while (get_bad(bad)) {
-
-                if (!rec_block(bad)) {
-                    logger(1) << "found counterexample at depth " << depth()
-                              << endlog;
-                    model_count_ += 1;
-                    print_frames();
-                    check_type_ = pdr;
-                    return false;
-                }
+        while (get_bad(bad)) {
+            if (!rec_block(bad)) {
+                logger(1) << "found counterexample at depth " << depth()
+                          << endlog;
+                model_count_ += 1;
+                print_frames();
+                check_type_ = pdr;
+                return false;
             }
         }
         new_frame();
         if(opts_.algorithm <=2 || model_count_ < 1) {
             // to maintain time, defined in utils.h
-            TimeKeeper t(total_time_);
+
             if (propagate()) {
 
                 model_count_ += 1;
@@ -197,10 +173,11 @@ bool FamilyIC3::prove()
             }
         }
     }
+    return false;
 }
 
 
-bool FamilyIC3::witness(std::vector<TermList> &out)
+bool FuseIC3::witness(std::vector<TermList> &out)
 {
     if (!cex_.empty()) {
         std::swap(cex_, out);
@@ -214,7 +191,7 @@ bool FamilyIC3::witness(std::vector<TermList> &out)
 }
 
 
-void FamilyIC3::print_stats() const
+void FuseIC3::print_stats() const
 {
 #define print_stat(n)                        \
     std::cout << #n << " = " << std::setprecision(3) << std::fixed       \
@@ -239,7 +216,7 @@ void FamilyIC3::print_stats() const
     print_stat(total_time);
 }
 
-void FamilyIC3::save_stats() const
+void FuseIC3::save_stats() const
 {
     std::ofstream xmlfile;
     std::string fl = opts_.filename;
@@ -250,7 +227,7 @@ void FamilyIC3::save_stats() const
     else if(opts_.algorithm == 1)
         filename = ".chockler";
     else if(opts_.algorithm == 3)
-        filename = ".nexus";
+        filename = ".FuseIC3";
     xmlfile.open(fl + filename + ".log.xml");
 
 #define save_stat(name, value) \
@@ -291,9 +268,11 @@ void FamilyIC3::save_stats() const
 //-----------------------------------------------------------------------------
 
 // method to check if new model satisfies last known invariant
-bool FamilyIC3::initial_invariant_check()
+bool FuseIC3::initial_invariant_check()
 {
+
     if(model_count_ > 0 && !last_invariant_.empty()) {
+
         logger(2) << "Trying last known invariant:" << endlog;
         for(Cube &c: last_invariant_) {
             logcube(3, c);
@@ -316,7 +295,7 @@ bool FamilyIC3::initial_invariant_check()
     return false;
 }
 
-bool FamilyIC3::simulate_last_cex()
+bool FuseIC3::simulate_last_cex()
 {
     if(model_count_ > 0 && !last_cex_.empty()) {
 
@@ -388,7 +367,7 @@ bool FamilyIC3::simulate_last_cex()
 }
 
 // method to find minimal inductive subclause from last known invariant
-bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
+bool FuseIC3::invariant_finder(std::vector<TermList> &inv)
 {
     if(model_count_ > 0 && !last_cex_.empty()) {
         // find the minimal inductive subclause from the set of
@@ -409,6 +388,7 @@ bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
         remove_clauses_violating_init(inv);
 
         // find minimal inductive subclause
+
         if(find_minimal_inductive_subclause(inv)) {
             min_clause_label_ = make_label("min");
             return true;
@@ -429,16 +409,18 @@ bool FamilyIC3::invariant_finder(std::vector<TermList> &inv)
         remove_clauses_violating_init(inv);
 
         // find minimal inductive subclause
+
         if(find_minimal_inductive_subclause(inv)) {
 
             min_clause_label_ = make_label("min");
             return true;
         }
     }
+
     return false;
 }
 
-bool FamilyIC3::check_init()
+bool FuseIC3::check_init()
 {
     TimeKeeper t(solve_time_);
 
@@ -457,12 +439,14 @@ bool FamilyIC3::check_init()
 }
 
 
-bool FamilyIC3::get_bad(Cube &out)
+bool FuseIC3::get_bad(Cube &out)
 {
+
     activate_frame(depth());
     activate_bad();
 
     if (solve()) {
+
         get_cube_from_model(out);
 
         logger(2) << "got bad cube of size " << out.size()
@@ -472,12 +456,13 @@ bool FamilyIC3::get_bad(Cube &out)
 
         return true;
     } else {
+
         return false;
     }
 }
 
 
-bool FamilyIC3::rec_block(const Cube &bad)
+bool FuseIC3::rec_block(const Cube &bad)
 {
     TimeKeeper t(rec_block_time_);
 
@@ -556,7 +541,7 @@ bool FamilyIC3::rec_block(const Cube &bad)
 }
 
 
-bool FamilyIC3::propagate()
+bool FuseIC3::propagate()
 {
     TimeKeeper t(propagate_time_);
     std::vector<Cube> to_add;
@@ -587,11 +572,12 @@ bool FamilyIC3::propagate()
 
         if(opts_.algorithm > 2 && k > old_frames_.size()-1 && old_frame_extended_) {
             if (frames_[k].empty()) {
+
                 // fixpoint: frames_[k] == frames_[k+1]
                 break;
             }
         }
-        if(opts_.algorithm > 2 && model_count_ > 1 && old_frames_.size() > 0) {
+        else if(opts_.algorithm > 2 && model_count_ > 0 && old_frames_.size() > 0) {
             // check if frame k equals frame k + 1
             // we first check this using sat?(frames_[k] & !frames_[k+1])
             // activate frames_[k]
@@ -627,7 +613,6 @@ bool FamilyIC3::propagate()
         }
         else {
             if (frames_[k].empty()) {
-                // fixpoint: frames_[k] == frames_[k+1]
                 break;
             }
         }
@@ -659,14 +644,14 @@ bool FamilyIC3::propagate()
 }
 
 
-bool FamilyIC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
+
+bool FuseIC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_cti)
 {
     TimeKeeper t(block_time_);
     ++num_block_;
 
     assert(idx > 0);
 
-    //reset_solver();
     // check whether ~c is inductive relative to F[idx-1], i.e.
     // ~c & F[idx-1] & T |= ~c', that is
     // solve(~c & F[idx-1] & T & c') is unsat
@@ -740,7 +725,7 @@ bool FamilyIC3::block(const Cube &c, unsigned int idx, Cube *out, bool compute_c
 }
 
 
-void FamilyIC3::generalize(Cube &c, unsigned int &idx)
+void FuseIC3::generalize(Cube &c, unsigned int &idx)
 {
     tmp_ = c;
     gen_needed_.clear();
@@ -784,7 +769,7 @@ void FamilyIC3::generalize(Cube &c, unsigned int &idx)
 }
 
 
-void FamilyIC3::push(Cube &c, unsigned int &idx)
+void FuseIC3::push(Cube &c, unsigned int &idx)
 {
     // find the highest idx frame in F which can successfully block c. As a
     // byproduct, this also further strenghens ~c if possible
@@ -800,10 +785,11 @@ void FamilyIC3::push(Cube &c, unsigned int &idx)
 }
 
 
-bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes)
+bool FuseIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes)
 {
     if(!old_frame_extended_) {
-        if (idx > 0 && idx <= old_frames_.size() - 1) {
+
+        if (idx > 0 && old_frames_.size() > 0 && idx <= old_frames_.size() - 1) {
 
             print_frames();
             // activate trans
@@ -882,7 +868,7 @@ bool FamilyIC3::check_frame_invariant(unsigned int idx, std::list<Cube *> &cubes
     return true;
 }
 
-void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
+void FuseIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {
     logger(1) << "Attempting Lavish Frame Repair at idx: " << idx
               << endlog;
@@ -914,7 +900,7 @@ void FamilyIC3::lavish_frame_repair(unsigned int idx, std::list<Cube *> &frame)
     }
 }
 
-void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame)
+void FuseIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {
     logger(1) << "Attempting Sensible Frame Repair at idx: " << idx
               << endlog;
@@ -1014,7 +1000,7 @@ void FamilyIC3::sensible_frame_repair(unsigned int idx, std::list<Cube *> &frame
 //-----------------------------------------------------------------------------
 
 
-void FamilyIC3::initialize()
+void FuseIC3::initialize()
 {
     for (msat_term v : ts_->statevars()) {
         if (msat_term_is_boolean_constant(ts_->get_env(), v)) {
@@ -1040,7 +1026,7 @@ void FamilyIC3::initialize()
 }
 
 
-void FamilyIC3::new_frame()
+void FuseIC3::new_frame()
 {
     if (depth()) {
         logger(1) << depth() << ": " << flushlog;
@@ -1067,7 +1053,7 @@ void FamilyIC3::new_frame()
 }
 
 
-void FamilyIC3::generalize_and_push(Cube &c, unsigned int &idx)
+void FuseIC3::generalize_and_push(Cube &c, unsigned int &idx)
 {
     TimeKeeper t(generalize_and_push_time_);
 
@@ -1075,7 +1061,7 @@ void FamilyIC3::generalize_and_push(Cube &c, unsigned int &idx)
     push(c, idx);
 }
 
-void FamilyIC3::add_blocked(Cube &c, unsigned int idx)
+void FuseIC3::add_blocked(Cube &c, unsigned int idx)
 {
     // whenever we add a clause ~c to an element of F, we also remove subsumed
     // clauses. This automatically keeps frames_ in a "delta encoded" form, in
@@ -1110,13 +1096,13 @@ void FamilyIC3::add_blocked(Cube &c, unsigned int idx)
 }
 
 
-inline void FamilyIC3::add_old_frame(Cube &c, unsigned int idx)
+inline void FuseIC3::add_old_frame(Cube &c, unsigned int idx)
 {
     solver_.add_cube_as_clause(c, frame_labels_[idx]);
 }
 
 
-FamilyIC3::Cube FamilyIC3::get_next(const Cube &c)
+FuseIC3::Cube FuseIC3::get_next(const Cube &c)
 {
     Cube ret;
     ret.reserve(c.size());
@@ -1130,7 +1116,7 @@ FamilyIC3::Cube FamilyIC3::get_next(const Cube &c)
 }
 
 
-void FamilyIC3::get_cube_from_model(Cube &out)
+void FuseIC3::get_cube_from_model(Cube &out)
 {
     out.clear();
     for (msat_term v : state_vars_) {
@@ -1140,14 +1126,14 @@ void FamilyIC3::get_cube_from_model(Cube &out)
 }
 
 
-inline bool FamilyIC3::subsumes(const Cube &a, const Cube &b)
+inline bool FuseIC3::subsumes(const Cube &a, const Cube &b)
 {
     return (a.size() <= b.size() &&
             std::includes(b.begin(), b.end(), a.begin(), a.end()));
 }
 
 
-bool FamilyIC3::is_blocked(const Cube &c, unsigned int idx)
+bool FuseIC3::is_blocked(const Cube &c, unsigned int idx)
 {
     // first check syntactic subsumption
     for (size_t i = idx; i < frames_.size(); ++i) {
@@ -1174,7 +1160,7 @@ bool FamilyIC3::is_blocked(const Cube &c, unsigned int idx)
 }
 
 
-bool FamilyIC3::is_initial(const Cube &c)
+bool FuseIC3::is_initial(const Cube &c)
 {
     activate_frame(0);
     activate_trans_bad(false, false);
@@ -1187,7 +1173,7 @@ bool FamilyIC3::is_initial(const Cube &c)
 }
 
 
-void FamilyIC3::ensure_not_initial(Cube &c, Cube &rest)
+void FuseIC3::ensure_not_initial(Cube &c, Cube &rest)
 {
     // we know that "init & c & rest" is unsat. If "init & c" is sat, we find
     // a small subset of "rest" to add-back to c to restore unsatisfiability
@@ -1213,7 +1199,7 @@ void FamilyIC3::ensure_not_initial(Cube &c, Cube &rest)
 }
 
 
-inline void FamilyIC3::activate_frame(unsigned int idx)
+inline void FuseIC3::activate_frame(unsigned int idx)
 {
     if(opts_.algorithm == 1 && min_clause_.size() > 0
             && idx > 0) {
@@ -1226,18 +1212,18 @@ inline void FamilyIC3::activate_frame(unsigned int idx)
 }
 
 
-inline void FamilyIC3::activate_bad() { activate_trans_bad(false, true); }
+inline void FuseIC3::activate_bad() { activate_trans_bad(false, true); }
 
-inline void FamilyIC3::activate_trans() { activate_trans_bad(true, false); }
+inline void FuseIC3::activate_trans() { activate_trans_bad(true, false); }
 
-inline void FamilyIC3::activate_trans_bad(bool trans_active, bool bad_active)
+inline void FuseIC3::activate_trans_bad(bool trans_active, bool bad_active)
 {
     solver_.assume(lit(trans_label_, !trans_active));
     solver_.assume(lit(bad_label_, !bad_active));
 }
 
 
-bool FamilyIC3::solve()
+bool FuseIC3::solve()
 {
     double elapse = 0;
     bool ret = false;
@@ -1246,6 +1232,7 @@ bool FamilyIC3::solve()
         ++num_solve_calls_;
 
         ret = solver_.check();
+
     }
     solve_time_ += elapse;
     if (ret) {
@@ -1255,11 +1242,12 @@ bool FamilyIC3::solve()
         solve_unsat_time_ += elapse;
         ++num_solve_unsat_calls_;
     }
+
     return ret;
 }
 
 
-void FamilyIC3::hard_reset()
+void FuseIC3::hard_reset()
 {
     // reset solver
     solver_.reset();
@@ -1309,7 +1297,7 @@ void FamilyIC3::hard_reset()
 }
 
 
-void FamilyIC3::soft_reset()
+void FuseIC3::soft_reset()
 {
     // reset solver
     solver_.reset();
@@ -1386,7 +1374,7 @@ void FamilyIC3::soft_reset()
 }
 
 
-void FamilyIC3::reset_solver()
+void FuseIC3::reset_solver()
 {
     logger(2) << "resetting SMT solver" << endlog;
     ++num_solver_reset_;
@@ -1424,31 +1412,31 @@ void FamilyIC3::reset_solver()
 }
 
 
-inline size_t FamilyIC3::depth()
+inline size_t FuseIC3::depth()
 {
     return frame_number - 1;
 }
 
 
-inline msat_term FamilyIC3::make_label(const char *name)
+inline msat_term FuseIC3::make_label(const char *name)
 {
     return vp_.fresh_var(name);
 }
 
 
-inline msat_term FamilyIC3::var(msat_term t)
+inline msat_term FuseIC3::var(msat_term t)
 {
-    return nexus::var(ts_->get_env(), t);
+    return fuse::var(ts_->get_env(), t);
 }
 
 
-inline msat_term FamilyIC3::lit(msat_term t, bool neg)
+inline msat_term FuseIC3::lit(msat_term t, bool neg)
 {
-    return nexus::lit(ts_->get_env(), t, neg);
+    return fuse::lit(ts_->get_env(), t, neg);
 }
 
 
-Logger &FamilyIC3::logcube(unsigned int level, const Cube &c)
+Logger &FuseIC3::logcube(unsigned int level, const Cube &c)
 {
     logger(level) << "[ ";
     for (msat_term l : c) {
@@ -1459,7 +1447,7 @@ Logger &FamilyIC3::logcube(unsigned int level, const Cube &c)
     return Logger::get();
 }
 
-bool FamilyIC3::initiation_check(const std::vector<TermList> &inv)
+bool FuseIC3::initiation_check(const std::vector<TermList> &inv)
 {
     // we have to check if (init & !inv) is unsat
 
@@ -1485,7 +1473,7 @@ bool FamilyIC3::initiation_check(const std::vector<TermList> &inv)
     return sat;
 }
 
-bool FamilyIC3::consecution_check(const std::vector<TermList> &inv)
+bool FuseIC3::consecution_check(const std::vector<TermList> &inv)
 {
     // we have to check  if (inv & trans & !inv')
 
@@ -1522,7 +1510,7 @@ bool FamilyIC3::consecution_check(const std::vector<TermList> &inv)
     return sat;
 }
 
-bool FamilyIC3::property_check(const std::vector<TermList> &inv)
+bool FuseIC3::property_check(const std::vector<TermList> &inv)
 {
     // we have to check if (inv & !p) is unsat
 
@@ -1545,7 +1533,7 @@ bool FamilyIC3::property_check(const std::vector<TermList> &inv)
     return sat;
 }
 
-void FamilyIC3::remove_clauses_violating_init(std::vector<TermList> &cubes)
+void FuseIC3::remove_clauses_violating_init(std::vector<TermList> &cubes)
 {
     std::vector<TermList> good_cubes; // temp to hold sat cubes
     good_cubes.clear();
@@ -1577,7 +1565,7 @@ void FamilyIC3::remove_clauses_violating_init(std::vector<TermList> &cubes)
     std::swap(cubes,good_cubes);
 }
 
-bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
+bool FuseIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
 {
     std::vector<TermList> temp;
     temp = cubes;
@@ -1598,7 +1586,9 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
         msat_term y_label = make_label("y");
 
         // generate shifted copy of c
+
         Cube cprimed = get_next(c);
+
         logger(3) << "Cube: ";
         logcube(3,cprimed);
         logger(3) << endlog;
@@ -1647,7 +1637,6 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
         else {
             for(uint32_t i = 0 ; i < y_labels.size() ; ) {
                 bool val = solver_.model_value(y_labels[i]);
-
                 if (!val) {
                     // remove clause
                     temp.erase(temp.begin()+i);
@@ -1664,7 +1653,7 @@ bool FamilyIC3::find_minimal_inductive_subclause(std::vector<TermList> &cubes)
     return false;
 }
 
-void FamilyIC3::print_frames()
+void FuseIC3::print_frames()
 {
     for(unsigned int i = 0 ; i < frames_.size() ; ++i)
     {
@@ -1679,7 +1668,7 @@ void FamilyIC3::print_frames()
     }
 }
 
-void FamilyIC3::get_old_frame(unsigned int idx, std::list<Cube *> &frame)
+void FuseIC3::get_old_frame(unsigned int idx, std::list<Cube *> &frame)
 {
     Cube * c;
     for(unsigned int i = idx-1 ; i < old_frames_.size() ; ++i) {
@@ -1691,7 +1680,7 @@ void FamilyIC3::get_old_frame(unsigned int idx, std::list<Cube *> &frame)
     }
 }
 
-void FamilyIC3::get_old_frame(std::vector<Cube> &frame)
+void FuseIC3::get_old_frame(std::vector<Cube> &frame)
 {
     frame.clear();
     Cube * c;
@@ -1705,7 +1694,7 @@ void FamilyIC3::get_old_frame(std::vector<Cube> &frame)
 
 }
 
-void FamilyIC3::apply_cone_of_influence()
+void FuseIC3::apply_cone_of_influence()
 {
     // remove vars not in current model from old frames
     for(unsigned int j = 0 ; j < old_frames_.size() ;) {
@@ -1807,13 +1796,13 @@ void FamilyIC3::apply_cone_of_influence()
     }
 }
 
-inline void FamilyIC3::frame_repair(unsigned int idx, std::list<Cube *> &frame)
+inline void FuseIC3::frame_repair(unsigned int idx, std::list<Cube *> &frame)
 {
     return opts_.algorithm == 3 ? lavish_frame_repair(idx, frame)
                                 : sensible_frame_repair(idx, frame);
 }
 
-void FamilyIC3::find_cubes_at_fault(unsigned int idx, std::list<Cube *> &frame,
+void FuseIC3::find_cubes_at_fault(unsigned int idx, std::list<Cube *> &frame,
                              std::list<Cube *> &cubes)
 {
 
@@ -1880,4 +1869,4 @@ void FamilyIC3::find_cubes_at_fault(unsigned int idx, std::list<Cube *> &frame,
 }
 
 
-} // namespace nexus
+} // namespace FuseIC3

@@ -1,5 +1,5 @@
 /*
- * This file is part of Nexus Model Checker.
+ * This file is part of FuseIC3.
  * author: Rohit Dureja <dureja at iastate dot edu>
  *
  * Copyright (C) 2017 Rohit Dureja,
@@ -39,7 +39,7 @@
 
 #include "solver.h"
 
-namespace nexus {
+namespace fuse {
 
 
 Solver::Solver(msat_env env, const Options &opts)
@@ -198,4 +198,4 @@ bool Solver::model_value(msat_term pred)
 }
 
 
-} // namespace nexus
+} // namespace FuseIC3
