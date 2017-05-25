@@ -7,7 +7,7 @@ For more details about FuseIC3, please visit: http://temporallogic.org/research/
 
 ---
 
-## Running FuseIC3
+## Building and Running FuseIC3
 
 * System Requirements
   * MathSAT5 (mathsat.fbk.eu)
