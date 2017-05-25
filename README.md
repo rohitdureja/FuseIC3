@@ -54,8 +54,8 @@ Usage:  ./FuseIC3 [options] folder
   -----------------------------------------------------------------
 
  Example usage scenarios
- ./FuseIC3 folder             runs simple algorithm on files in folder
- ./FuseIC3 -p folder          runs simple algorithm using priority queues on files in folder
- ./FuseIC3 -f 3 folder        runs family algorithm number 10 on files in folder
- ./FuseIC3 -p -f 2 folder     runs family algorithm number 2 using priority queues on files in folder
+ ./FuseIC3 folder             runs simple IC3 algorithm on files in folder
+ ./FuseIC3 -p folder          runs simple IC3 algorithm using priority queues on files in folder
+ ./FuseIC3 -f 3 folder        runs model-sets checking algorithm number 3 on files in folder
+ ./FuseIC3 -p -f 2 folder     runs model-sets checking algorithm number 2 using priority queues on files in folder
 ```
