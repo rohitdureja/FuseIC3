@@ -7,7 +7,7 @@ For more details about FuseIC3, please visit: http://temporallogic.org/research/
 
 ---
 
-## Building and Running FuseIC3
+## Building FuseIC3
 
 * System Requirements
   * MathSAT5 (mathsat.fbk.eu)
@@ -24,7 +24,7 @@ cmake ..
 make
 ```
 
-## Usage
+## Using FuseIC3
 
 ```
 Usage:  ./FuseIC3 [options] folder
