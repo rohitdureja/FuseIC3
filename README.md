@@ -3,6 +3,8 @@
 
 FuseIC3 is a SAT-based algorithm for checking a set of models. It extends IC3 to minimize time spent in exploring the common state space between related models. 
 
+Rohit Dureja and Kristin Yvonne Rozier. *“FuseIC3: An Algorithm for Checking Large Design Spaces.”* In Formal Methods in Computer-Aided Design (FMCAD 2017), IEEE/ACM, Vienna, Austria, October 2-6, 2017.
+
 For more details about FuseIC3, please visit: http://temporallogic.org/research/FMCAD17
 
 ---
